@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acesso ao Jogo — Posicione, Automatize e Venda no Digital</title>
+<meta name="description" content="O método para posicionar, automatizar e vender no digital com clareza e direção. Para quem quer fazer a primeira venda online de verdade.">
+<meta property="og:title" content="Acesso ao Jogo — Andrey Mendonça">
+<meta property="og:description" content="Posicione, automatize e venda no digital com clareza e direção.">
+<meta property="og:type" content="website">
+
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '2004579216803757');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=2004579216803757&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#070d0a;
+  --bg-2:#0c1812;
+  --green-deep:#0f2e22;
+  --green-mid:#1a5c3f;
+  --green-bright:#2ecc71;
+  --green-glow:#50e896;
+  --gold:#d4af37;
+  --gold-bright:#f4cf57;
+  --white:#ffffff;
+  --gray:#a8b5b0;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--white);
+  font-family:'Inter',sans-serif;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+.font-display{font-family:'Cinzel',serif;letter-spacing:0.02em;}
+.container{max-width:1100px;margin:0 auto;padding:0 20px;}
+section{padding:80px 0;position:relative;}
+.gold{color:var(--gold-bright);}
+.green{color:var(--green-glow);}
+
+/* === HERO === */
+.hero{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  background:radial-gradient(ellipse at center, var(--green-deep) 0%, var(--bg) 60%);
+  padding:60px 20px 40px;
+  position:relative;
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:url('images/capa-do-site.png') center/cover no-repeat;
+  opacity:0.15;
+  z-index:0;
+}
+.hero-content{position:relative;z-index:1;max-width:900px;}
+.hero h1{
+  font-family:'Cinzel',serif;
+  font-size:clamp(36px,7vw,72px);
+  font-weight:800;
+  line-height:1.1;
+  margin-bottom:20px;
+  background:linear-gradient(180deg,#fff 0%,var(--gold-bright) 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 0 40px rgba(212,175,55,0.3);
+}
+.hero h1 .accent{
+  color:var(--green-glow);
+  -webkit-text-fill-color:var(--green-glow);
+}
+.hero p.sub{
+  font-size:clamp(16px,2.2vw,22px);
+  color:var(--white);
+  margin-bottom:36px;
+  max-width:700px;
+  margin-left:auto;
+  margin-right:auto;
+  opacity:0.92;
+}
+.btn-primary{
+  display:inline-block;
+  background:linear-gradient(135deg,var(--green-bright),var(--green-mid));
+  color:#fff;
+  padding:18px 42px;
+  font-size:18px;
+  font-weight:800;
+  text-decoration:none;
+  border-radius:50px;
+  border:none;
+  cursor:pointer;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  box-shadow:0 10px 40px rgba(46,204,113,0.4);
+  transition:all 0.3s ease;
+  position:relative;
+  overflow:hidden;
+}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 15px 50px rgba(46,204,113,0.6);}
+.btn-primary::after{
+  content:'→';
+  margin-left:10px;
+  display:inline-block;
+  transition:transform 0.3s;
+}
+.btn-primary:hover::after{transform:translateX(6px);}
+
+.hero-badge{
+  display:inline-block;
+  background:rgba(212,175,55,0.15);
+  border:1px solid var(--gold);
+  color:var(--gold-bright);
+  padding:6px 16px;
+  border-radius:50px;
+  font-size:13px;
+  font-weight:600;
+  margin-bottom:24px;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+}
+
+/* === SOÇÃO PADRÃO === */
+.section-title{
+  font-family:'Cinzel',serif;
+  font-size:clamp(28px,5vw,48px);
+  font-weight:800;
+  text-align:center;
+  margin-bottom:18px;
+  line-height:1.15;
+}
+.section-subtitle{
+  text-align:center;
+  font-size:clamp(15px,2vw,18px);
+  color:var(--gray);
+  max-width:700px;
+  margin:0 auto 50px;
+}
+
+/* === PROBLEMA === */
+.problem{
+  background:linear-gradient(180deg,var(--bg) 0%,#1a0808 50%,var(--bg) 100%);
+}
+.problem ul{
+  list-style:none;
+  max-width:700px;
+  margin:0 auto;
+}
+.problem li{
+  font-size:18px;
+  padding:14px 0;
+  padding-left:36px;
+  position:relative;
+  color:#e0e0e0;
+}
+.problem li::before{
+  content:'✗';
+  position:absolute;
+  left:0;
+  color:#e74c3c;
+  font-weight:900;
+  font-size:22px;
+}
+
+/* === PROVA === */
+.proof-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:24px;
+  margin-top:40px;
+}
+.proof-img{
+  width:100%;
+  border-radius:16px;
+  box-shadow:0 16px 48px rgba(46,204,113,0.3);
+  object-fit:cover;
+  display:block;
+}
+
+/* === SOLUCAO === */
+.solution{
+  background:linear-gradient(180deg,var(--bg) 0%,var(--green-deep) 50%,var(--bg) 100%);
+}
+.solution ul{
+  list-style:none;
+  max-width:700px;
+  margin:0 auto;
+}
+.solution li{
+  font-size:18px;
+  padding:14px 0;
+  padding-left:36px;
+  position:relative;
+  color:#e0f5e8;
+}
+.solution li::before{
+  content:'✓';
+  position:absolute;
+  left:0;
+  color:var(--green-glow);
+  font-weight:900;
+  font-size:22px;
+}
+
+/* === MÓDULOS === */
+.modules-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:24px;
+  margin-top:30px;
+}
+.module-card{
+  background:linear-gradient(180deg,var(--bg-2) 0%,#000 100%);
+  border:1px solid rgba(212,175,55,0.2);
+  border-radius:20px;
+  overflow:hidden;
+  transition:all 0.3s;
+}
+.module-card:hover{
+  border-color:var(--green-glow);
+  transform:translateY(-5px);
+  box-shadow:0 20px 50px rgba(46,204,113,0.2);
+}
+.module-img{
+  width:100%;
+  height:240px;
+  object-fit:cover;
+  background:#0a0a0a;
+}
+.module-body{padding:24px;}
+.module-tag{
+  font-size:12px;
+  color:var(--gold);
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.module-title{
+  font-family:'Cinzel',serif;
+  font-size:22px;
+  font-weight:700;
+  margin:10px 0 16px;
+  color:#fff;
+}
+.module-card ul{list-style:none;}
+.module-card ul li{
+  padding:8px 0 8px 22px;
+  position:relative;
+  font-size:14px;
+  color:#d0d0d0;
+}
+.module-card ul li::before{
+  content:'▸';
+  position:absolute;
+  left:0;
+  color:var(--green-glow);
+}
+
+/* === BÔNUS === */
+.bonus{
+  background:linear-gradient(135deg,var(--green-deep) 0%,#1c0838 100%);
+}
+.bonus-card{
+  background:rgba(0,0,0,0.5);
+  border:2px solid var(--gold);
+  border-radius:24px;
+  padding:40px 30px;
+  text-align:center;
+  max-width:600px;
+  margin:0 auto;
+  position:relative;
+}
+.bonus-badge{
+  position:absolute;
+  top:-15px;
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--gold);
+  color:#000;
+  padding:6px 20px;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:1px;
+  border-radius:30px;
+  text-transform:uppercase;
+}
+.bonus-card h3{
+  font-family:'Cinzel',serif;
+  font-size:28px;
+  color:var(--gold-bright);
+  margin:14px 0;
+}
+.bonus-card p{font-size:17px;color:#fff;}
+
+/* === SOBRE ANDREY === */
+.about{
+  background:var(--bg-2);
+}
+.about-grid{
+  display:grid;
+  grid-template-columns:1fr 1.2fr;
+  gap:50px;
+  align-items:center;
+  max-width:1000px;
+  margin:0 auto;
+}
+@media(max-width:768px){
+  .about-grid{grid-template-columns:1fr;text-align:center;}
+}
+.about-img{
+  width:100%;
+  border-radius:20px;
+  box-shadow:0 20px 60px rgba(212,175,55,0.3);
+}
+.about-text h2{
+  font-family:'Cinzel',serif;
+  font-size:clamp(28px,4vw,40px);
+  margin-bottom:20px;
+  background:linear-gradient(180deg,#fff,var(--gold-bright));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.about-text p{margin-bottom:16px;font-size:17px;color:#d8d8d8;}
+.credentials{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:24px;
+}
+.cred-badge{
+  background:rgba(212,175,55,0.15);
+  border:1px solid var(--gold);
+  color:var(--gold-bright);
+  padding:8px 16px;
+  border-radius:30px;
+  font-size:13px;
+  font-weight:600;
+}
+
+/* === GARANTIA === */
+.guarantee{
+  background:linear-gradient(180deg,var(--bg) 0%,var(--green-deep) 100%);
+}
+.guarantee-box{
+  max-width:700px;
+  margin:0 auto;
+  text-align:center;
+  background:rgba(46,204,113,0.05);
+  border:2px dashed var(--green-glow);
+  padding:40px 30px;
+  border-radius:24px;
+}
+.guarantee-box .seal{
+  font-size:60px;
+  margin-bottom:16px;
+}
+.guarantee-box h3{
+  font-family:'Cinzel',serif;
+  font-size:30px;
+  color:var(--green-glow);
+  margin-bottom:14px;
+}
+.guarantee-box p{font-size:17px;color:#e0e0e0;}
+
+/* === PREÇO === */
+.pricing{
+  background:radial-gradient(ellipse at center,var(--green-deep) 0%,var(--bg) 70%);
+}
+.price-card{
+  max-width:520px;
+  margin:0 auto;
+  background:linear-gradient(180deg,#0a1d14 0%,#000 100%);
+  border:2px solid var(--gold);
+  border-radius:30px;
+  padding:50px 36px;
+  text-align:center;
+  box-shadow:0 30px 100px rgba(212,175,55,0.3);
+}
+.price-card .label{
+  font-size:13px;
+  color:var(--gold);
+  font-weight:700;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:14px;
+}
+.price-old{
+  font-size:24px;
+  text-decoration:line-through;
+  color:#666;
+  margin-bottom:6px;
+}
+.price-now{
+  font-size:64px;
+  font-weight:900;
+  color:var(--green-glow);
+  margin-bottom:8px;
+  line-height:1;
+}
+.price-now .currency{font-size:28px;vertical-align:top;}
+.price-installment{
+  font-size:16px;
+  color:#aaa;
+  margin-bottom:30px;
+}
+.value-list{
+  text-align:left;
+  margin:30px 0;
+  padding:24px;
+  background:rgba(255,255,255,0.03);
+  border-radius:16px;
+}
+.value-list .v-item{
+  display:flex;
+  justify-content:space-between;
+  padding:8px 0;
+  font-size:15px;
+  color:#ddd;
+}
+.value-list .v-item .v-price{color:var(--gold-bright);font-weight:600;}
+.value-list .total{
+  margin-top:12px;
+  padding-top:14px;
+  border-top:1px solid rgba(212,175,55,0.3);
+  font-size:16px;
+  font-weight:700;
+}
+.value-list .total .v-price{color:var(--green-glow);}
+
+/* === FAQ === */
+.faq{background:var(--bg-2);}
+.faq-item{
+  max-width:800px;
+  margin:0 auto 14px;
+  background:#0a1410;
+  border:1px solid rgba(46,204,113,0.15);
+  border-radius:14px;
+  overflow:hidden;
+}
+.faq-item summary{
+  padding:20px 24px;
+  cursor:pointer;
+  font-weight:600;
+  font-size:17px;
+  list-style:none;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  color:#fff;
+}
+.faq-item summary::-webkit-details-marker{display:none;}
+.faq-item summary::after{
+  content:'+';
+  font-size:28px;
+  color:var(--green-glow);
+  font-weight:300;
+  transition:transform 0.3s;
+}
+.faq-item[open] summary::after{transform:rotate(45deg);}
+.faq-item p{
+  padding:0 24px 22px;
+  color:#bbb;
+  font-size:15px;
+}
+
+/* === CTA FINAL === */
+.final-cta{
+  background:linear-gradient(180deg,var(--bg) 0%,#000 100%);
+  text-align:center;
+}
+.final-cta h2{
+  font-family:'Cinzel',serif;
+  font-size:clamp(28px,5vw,46px);
+  margin-bottom:20px;
+}
+.final-cta p{
+  font-size:18px;
+  color:#bbb;
+  margin-bottom:36px;
+}
+.scarcity{
+  display:inline-block;
+  background:rgba(231,76,60,0.15);
+  border:1px solid #e74c3c;
+  color:#e74c3c;
+  padding:8px 18px;
+  border-radius:30px;
+  font-size:14px;
+  font-weight:600;
+  margin-bottom:30px;
+}
+
+/* === NOTIFICAÇÕES PERSUASIVAS === */
+.persuasive-notif{
+  position:fixed;
+  bottom:24px;
+  left:24px;
+  background:rgba(10,26,18,0.97);
+  border:1px solid var(--green-mid);
+  border-left:4px solid var(--green-bright);
+  color:#fff;
+  padding:14px 18px;
+  border-radius:12px;
+  max-width:300px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  z-index:1000;
+  opacity:0;
+  transform:translateY(16px);
+  transition:opacity 0.4s ease,transform 0.4s ease;
+  pointer-events:none;
+}
+.persuasive-notif.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+.persuasive-notif .notif-icon{
+  display:inline-block;
+  margin-right:6px;
+  font-size:15px;
+}
+.persuasive-notif .notif-text{
+  font-size:14px;
+  line-height:1.45;
+  color:#e0f5e8;
+}
+@keyframes notifIn{
+  from{opacity:0;transform:translateY(16px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes notifOut{
+  from{opacity:1;transform:translateY(0);}
+  to{opacity:0;transform:translateY(16px);}
+}
+
+/* === RESPONSIVO === */
+@media(max-width:600px){
+  section{padding:60px 0;}
+  .hero{min-height:90vh;}
+  .price-card{padding:36px 20px;}
+  .persuasive-notif{left:12px;right:12px;max-width:calc(100vw - 24px);}
+}
+</style>
+</head>
+<body>
+
+<!-- =================== HERO =================== -->
+<section class="hero">
+  <div class="hero-content">
+    <span class="hero-badge">⚡ Vagas Limitadas — Próxima Turma</span>
+    <h1>Acesso ao <span class="accent">Jogo</span></h1>
+    <p class="sub">Posicione, automatize e venda no digital com <strong>clareza e direção</strong>. O método para quem está pronto para entrar no jogo de verdade.</p>
+    <a href="https://wa.me/message/LADHBITCX7XJH1" class="btn-primary" onclick="fbq('track','InitiateCheckout');">QUERO VENDER</a>
+    <p style="margin-top:20px;font-size:14px;color:#aaa;">🔒 Pagamento 100% seguro · Garantia de 7 dias</p>
+  </div>
+</section>
+
+<!-- =================== PROBLEMA =================== -->
+<section class="problem">
+  <div class="container">
+    <h2 class="section-title">Se você ainda <span style="color:#e74c3c;">não vendeu</span> online…</h2>
+    <p class="section-subtitle">Provavelmente é por uma dessas razões. Marca aqui mentalmente quantas tu sente:</p>
+    <ul>
+      <li>Já assistiu cursos grátis de YouTube mas nunca conseguiu colocar nada em prática</li>
+      <li>Tentou tráfego pago e queimou dinheiro sem saber o que estava fazendo errado</li>
+      <li>Não sabe qual produto vender e fica pulando de ideia em ideia</li>
+      <li>Tem medo de aparecer, gravar conteúdo, postar e ser julgado</li>
+      <li>Olha pros gurus do digital e pensa: "isso é coisa pra outro nível, não pra mim"</li>
+      <li>Sente que falta UM passo a passo claro, sem enrolação, que funciona de verdade</li>
+    </ul>
+    <p style="text-align:center;margin-top:40px;font-size:18px;color:#fff;max-width:700px;margin-left:auto;margin-right:auto;">Se marcou 2 ou mais, você está no lugar certo. <strong class="green">Vou te mostrar o que ninguém te ensinou ainda.</strong></p>
+  </div>
+</section>
+
+<!-- =================== PROVA =================== -->
+<section style="background:var(--bg-2);">
+  <div class="container">
+    <h2 class="section-title">Resultado <span class="green">Real</span></h2>
+    <p class="section-subtitle">Vendas chegando enquanto você lê isso. Esse é o jogo que a maioria não vê.</p>
+    <div class="proof-grid">
+      <img src="images/resultado-1.png" alt="Resultado real — notificações de vendas" class="proof-img">
+      <img src="images/resultado-2.png" alt="Resultado real — notificações de vendas" class="proof-img">
+      <img src="images/resultado-3.jpg" alt="Resultado real — comprovante de vendas" class="proof-img">
+    </div>
+  </div>
+</section>
+
+<!-- =================== SOLUÇÃO =================== -->
+<section class="solution">
+  <div class="container">
+    <h2 class="section-title">O <span class="gold">Método</span> que destrava tudo</h2>
+    <p class="section-subtitle">Acesso ao Jogo é o passo a passo de quem já vendeu no digital — sem teoria mascarada, sem fórmula mágica, só execução validada.</p>
+    <ul>
+      <li><strong>Encontre seu produto</strong> mesmo se você acha que "não tem nada pra vender"</li>
+      <li><strong>Posicionamento certo</strong> que te separa do mar de iniciantes</li>
+      <li><strong>Estrutura plug-and-play</strong> de página, criativo e checkout</li>
+      <li><strong>Tráfego pago descomplicado</strong> (até quem nunca rodou anúncio entende)</li>
+      <li><strong>Método orgânico</strong> que gera venda sem precisar gastar com ads</li>
+      <li><strong>Acompanhamento ao vivo</strong> toda semana comigo na call</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =================== MÓDULOS =================== -->
+<section>
+  <div class="container">
+    <h2 class="section-title">O que você vai <span class="green">aprender</span></h2>
+    <p class="section-subtitle">4 módulos, 19 aulas práticas + 2 aulas bônus. Tudo gravado, acesso imediato.</p>
+
+    <div class="modules-grid">
+      <!-- MÓDULO 1 -->
+      <div class="module-card">
+        <img src="images/modulo-1.png" alt="Módulo 1 — Fundamentos" class="module-img">
+        <div class="module-body">
+          <span class="module-tag">Módulo 1</span>
+          <h3 class="module-title">Fundamentos do Marketing Digital</h3>
+          <ul>
+            <li>Introdução ao Jogo</li>
+            <li>O que é Marketing Digital</li>
+            <li>O que é Nicho (e como achar o seu)</li>
+            <li>O que é um Infoproduto</li>
+            <li>Aula Bônus</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- MÓDULO 2 -->
+      <div class="module-card">
+        <img src="images/modulo-2.png" alt="Módulo 2 — Produto e Criativo" class="module-img">
+        <div class="module-body">
+          <span class="module-tag">Módulo 2</span>
+          <h3 class="module-title">Produto, Criativo e Página de Vendas</h3>
+          <ul>
+            <li>Produto pronto no Notion (copia e cola)</li>
+            <li>Cadastrando seu produto</li>
+            <li>Design de criativo no Canva</li>
+            <li>Página de vendas com IA + checkout</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- MÓDULO 3 -->
+      <div class="module-card">
+        <img src="images/modulo-3.png" alt="Módulo 3 — Pixel e Anúncio" class="module-img">
+        <div class="module-body">
+          <span class="module-tag">Módulo 3</span>
+          <h3 class="module-title">Página, Pixel e Anúncio</h3>
+          <ul>
+            <li>Criando uma página</li>
+            <li>O que é Pixel</li>
+            <li>Criando um pixel do zero</li>
+            <li>Integrando pixel com IA</li>
+            <li>Criando um anúncio</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- MÓDULO 4 -->
+      <div class="module-card">
+        <img src="images/modulo-4.png" alt="Módulo 4 — Orgânico" class="module-img">
+        <div class="module-body">
+          <span class="module-tag">Módulo 4</span>
+          <h3 class="module-title">Método Orgânico e Estrutura</h3>
+          <ul>
+            <li>Método Orgânico (zero investimento)</li>
+            <li>Montando a estrutura</li>
+            <li>Vinculando a plataforma</li>
+            <li>Ativando o Matador de Lead</li>
+            <li>Aula Bônus</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== BÔNUS =================== -->
+<section class="bonus">
+  <div class="container">
+    <h2 class="section-title">Bônus <span class="gold">Exclusivo</span></h2>
+    <p class="section-subtitle">O que NENHUM outro curso de R$97 entrega no Brasil.</p>
+    <div class="bonus-card">
+      <span class="bonus-badge">★ Bônus Premium</span>
+      <div style="font-size:48px;">📞</div>
+      <h3>Call Semanal ao Vivo</h3>
+      <p>Toda semana, 1 hora comigo ao vivo tirando suas dúvidas, revisando seu produto, te ajudando a destravar o que travou. Mentoria em grupo embutida no curso.</p>
+      <p style="margin-top:14px;font-size:14px;color:#aaa;">Valor real: <span style="text-decoration:line-through;">R$ 997</span> · Você recebe <span class="gold">GRÁTIS</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- =================== SOBRE ANDREY =================== -->
+<section class="about">
+  <div class="container">
+    <div class="about-grid">
+      <img src="images/andrey.jpg" alt="Andrey Mendonça" class="about-img">
+      <div class="about-text">
+        <h2>Quem está do outro lado</h2>
+        <p>Sou Andrey Mendonça, 25 anos. Atuei como <strong>closer de high ticket pela Cakto</strong>, fechando vendas para produtores reconhecidos do mercado digital brasileiro.</p>
+        <p>Fui premiado pela meta de <strong>10 mil reais em vendas</strong> durante minha passagem na empresa. Depois disso, decidi sair pra construir o MEU negócio — e aprender, na prática, o jogo do digital como dono.</p>
+        <p>Hoje, ensino o método que tirou eu (e meus primeiros alunos) da fase de "tentando" para a fase de "vendendo". Sem rodeio. Sem promessa vazia.</p>
+        <div class="credentials">
+          <span class="cred-badge">Ex-Closer Cakto</span>
+          <span class="cred-badge">10K em Vendas (Premiado)</span>
+          <span class="cred-badge">Especialista em Copy & Tráfego</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== GARANTIA =================== -->
+<section class="guarantee">
+  <div class="container">
+    <div class="guarantee-box">
+      <div class="seal">🛡️</div>
+      <h3>Garantia Incondicional de 7 Dias</h3>
+      <p>Testa o curso por 7 dias completos. Se em qualquer momento desse período você sentir que não é pra você, pede teu dinheiro de volta e devolvemos sem perguntas. Risco zero pra ti — todo o risco é meu.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =================== PREÇO E CTA =================== -->
+<section class="pricing">
+  <div class="container">
+    <h2 class="section-title">Pronto pra entrar no <span class="green">jogo</span>?</h2>
+    <div class="price-card">
+      <div class="label">Acesso ao Jogo</div>
+      <div class="price-old">De R$ 497,00</div>
+      <div class="price-now"><span class="currency">R$</span>97</div>
+      <div class="price-installment">ou em até 12x no cartão</div>
+
+<a href="https://wa.me/message/LADHBITCX7XJH1" class="btn-primary" onclick="fbq('track','InitiateCheckout');" style="display:block;">QUERO VENDER</a>
+      <p style="margin-top:18px;font-size:13px;color:#888;">🔒 Pagamento seguro processado pela Cakto · 🛡️ Garantia de 7 dias</p>
+    </div>
+  </div>
+</section>
+
+<!-- =================== FAQ =================== -->
+<section class="faq">
+  <div class="container">
+    <h2 class="section-title">Dúvidas <span class="gold">Frequentes</span></h2>
+    <p class="section-subtitle">As perguntas mais comuns antes de entrar no jogo.</p>
+
+    <details class="faq-item">
+      <summary>Eu nunca vendi nada online. Esse curso é pra mim?</summary>
+      <p>Sim. O curso foi montado exatamente pra quem está começando do zero. Eu te levo do "não sei o que vender" até a primeira venda. Sem pular etapas.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>Quanto tempo até eu fazer minha primeira venda?</summary>
+      <p>Depende da sua execução. Alunos que aplicam o método em 4-7 dias conseguem fazer a primeira venda. Quem demora mais, geralmente é por travar em "estudar" em vez de executar. As calls semanais existem justamente pra te destravar.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>Preciso investir dinheiro além do curso?</summary>
+      <p>Não obrigatoriamente. O Módulo 4 é todo dedicado ao método orgânico (zero investimento em ads). Mas se você quiser acelerar com tráfego pago, R$10-30/dia já é suficiente pra começar a testar.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>Como funcionam as calls semanais?</summary>
+      <p>Toda semana eu abro uma call ao vivo de 1 hora pra tirar dúvidas dos alunos. Você manda sua pergunta antes ou durante e eu respondo na hora. Tudo gravado pra rever depois.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>Posso assistir pelo celular?</summary>
+      <p>Sim. Todo o curso é hospedado na Cakto e funciona em qualquer dispositivo: celular, tablet ou computador.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>E se eu não gostar?</summary>
+      <p>Você tem 7 dias de garantia incondicional. Não precisa justificar nada. Pede o reembolso e devolvemos 100% do valor.</p>
+    </details>
+
+    <details class="faq-item">
+      <summary>O acesso é vitalício?</summary>
+      <p>O curso base tem acesso por período. O upgrade pra acesso vitalício está disponível no checkout como opção extra (recomendado).</p>
+    </details>
+  </div>
+</section>
+
+<!-- =================== CTA FINAL =================== -->
+<section class="final-cta">
+  <div class="container">
+    <span class="scarcity">⚡ Vagas limitadas — Próxima turma fechando</span>
+    <h2>O jogo está aberto. <span class="green">Só falta você entrar.</span></h2>
+    <p>Em 30 dias você pode estar em outro lugar. Ou no mesmo. Decisão tua.</p>
+    <a href="https://wa.me/message/LADHBITCX7XJH1" class="btn-primary" onclick="fbq('track','InitiateCheckout');">QUERO VENDER</a>
+    <p style="margin-top:20px;font-size:13px;color:#888;">Pagamento seguro · 7 dias de garantia · Suporte direto comigo</p>
+  </div>
+</section>
+
+<!-- =================== NOTIFICAÇÕES PERSUASIVAS =================== -->
+<div class="persuasive-notif" id="persuasiveNotif">
+  <span class="notif-icon">🔔</span>
+  <span class="notif-text" id="persuasiveText"></span>
+</div>
+
+<script>
+const notifMessages = [
+  "🟢 Novo acesso liberado há 2 minutos.",
+  "🔴 Mais uma vaga foi preenchida.",
+  "🟢 Mais um acesso foi liberado.",
+  "⚡ Clique no botão abaixo para garantir sua vaga."
+];
+let notifIndex = 0;
+const notifEl = document.getElementById('persuasiveNotif');
+const notifText = document.getElementById('persuasiveText');
+
+function showNotif() {
+  notifText.textContent = notifMessages[notifIndex % notifMessages.length];
+  notifEl.classList.add('visible');
+  setTimeout(function() {
+    notifEl.classList.remove('visible');
+    notifIndex++;
+    setTimeout(showNotif, 4000);
+  }, 4500);
+}
+
+setTimeout(showNotif, 5000);
+</script>
+
+</body>
+</html>
