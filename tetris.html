@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris — Estilo Anos 2000</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:#000 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23000"/><rect width="1" height="1" fill="%23111"/></svg>');
+    color:#0f0;
+    font-family:'Courier New',monospace;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100vh;
+    padding:12px;
+    user-select:none;
+  }
+  h1{
+    font-size:32px;
+    letter-spacing:8px;
+    color:#0f0;
+    text-shadow:0 0 8px #0f0, 0 0 20px #0f0;
+    margin:10px 0;
+  }
+  .wrap{display:flex;gap:16px;align-items:flex-start;}
+  canvas{
+    background:#050505;
+    border:4px double #0f0;
+    box-shadow:0 0 16px rgba(0,255,0,.4), inset 0 0 30px rgba(0,255,0,.08);
+    image-rendering:pixelated;
+  }
+  .panel{
+    border:2px solid #0f0;
+    padding:10px;
+    width:130px;
+    font-size:14px;
+    line-height:1.7;
+    box-shadow:0 0 10px rgba(0,255,0,.3);
+  }
+  .panel h2{font-size:14px;border-bottom:1px dashed #0f0;margin-bottom:6px;}
+  .panel .val{color:#ff0;text-shadow:0 0 6px #ff0;font-size:18px;}
+  #next{display:block;margin:6px auto;border:1px solid #0f0;}
+  .keys{font-size:11px;margin-top:10px;color:#9f9;}
+  #msg{
+    margin-top:10px;
+    font-size:16px;
+    color:#f33;
+    text-shadow:0 0 8px #f33;
+    min-height:22px;
+    animation:blink 1s step-end infinite;
+  }
+  @keyframes blink{50%{opacity:0;}}
+  .mob{display:none;gap:8px;margin-top:12px;}
+  .mob button{
+    background:#000;color:#0f0;border:2px solid #0f0;
+    font-family:inherit;font-size:20px;padding:10px 16px;
+    box-shadow:0 0 8px rgba(0,255,0,.4);
+  }
+  .mob button:active{background:#0f0;color:#000;}
+  @media (max-width:600px){
+    .mob{display:flex;}
+    h1{font-size:22px;letter-spacing:4px;}
+  }
+</style>
+</head>
+<body>
+<h1>TETRIS</h1>
+<div class="wrap">
+  <canvas id="game" width="240" height="480"></canvas>
+  <div class="panel">
+    <h2>PONTOS</h2><div class="val" id="score">0</div>
+    <h2>LINHAS</h2><div class="val" id="lines">0</div>
+    <h2>NÍVEL</h2><div class="val" id="level">1</div>
+    <h2>PRÓXIMA</h2><canvas id="next" width="96" height="96"></canvas>
+    <div class="keys">
+      ← → mover<br>
+      ↑ girar<br>
+      ↓ descer<br>
+      ESPAÇO cair<br>
+      P pausar<br>
+      ENTER reiniciar
+    </div>
+  </div>
+</div>
+<div id="msg"></div>
+<div class="mob">
+  <button id="bl">←</button>
+  <button id="br2">↻</button>
+  <button id="bd">↓</button>
+  <button id="br">→</button>
+  <button id="bdrop">⤓</button>
+</div>
+
+<script>
+const COLS=10, ROWS=20, SIZE=24;
+const cv=document.getElementById('game'), cx=cv.getContext('2d');
+const nv=document.getElementById('next'), nx=nv.getContext('2d');
+
+const SHAPES={
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[1,1],[1,1]],
+  T:[[0,1,0],[1,1,1],[0,0,0]],
+  S:[[0,1,1],[1,1,0],[0,0,0]],
+  Z:[[1,1,0],[0,1,1],[0,0,0]],
+  J:[[1,0,0],[1,1,1],[0,0,0]],
+  L:[[0,0,1],[1,1,1],[0,0,0]]
+};
+const COLORS={I:'#0ff',O:'#ff0',T:'#f0f',S:'#0f0',Z:'#f00',J:'#00f',L:'#fa0'};
+
+let board, piece, nextPiece, score, lines, level, dropTimer, over, paused;
+
+function newPiece(){
+  const keys=Object.keys(SHAPES);
+  const t=keys[Math.floor(Math.random()*keys.length)];
+  return {type:t, shape:SHAPES[t].map(r=>r.slice()), x:Math.floor((COLS-SHAPES[t][0].length)/2), y:0};
+}
+
+function reset(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  score=0; lines=0; level=1; over=false; paused=false;
+  piece=newPiece(); nextPiece=newPiece();
+  document.getElementById('msg').textContent='';
+  restartTimer();
+  updateHud(); draw();
+}
+
+function restartTimer(){
+  clearInterval(dropTimer);
+  dropTimer=setInterval(tick, Math.max(80, 800-(level-1)*70));
+}
+
+function collides(p, dx, dy, shape){
+  shape=shape||p.shape;
+  for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++){
+    if(!shape[y][x])continue;
+    const nx2=p.x+x+dx, ny=p.y+y+dy;
+    if(nx2<0||nx2>=COLS||ny>=ROWS)return true;
+    if(ny>=0&&board[ny][nx2])return true;
+  }
+  return false;
+}
+
+function rotate(){
+  const s=piece.shape;
+  const r=s[0].map((_,i)=>s.map(row=>row[i]).reverse());
+  for(const kick of [0,-1,1,-2,2]){
+    if(!collides(piece,kick,0,r)){piece.x+=kick;piece.shape=r;return;}
+  }
+}
+
+function lock(){
+  piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+    if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=COLORS[piece.type];
+  }));
+  let cleared=0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(board[y].every(c=>c)){
+      board.splice(y,1);
+      board.unshift(Array(COLS).fill(null));
+      cleared++; y++;
+    }
+  }
+  if(cleared){
+    score+=[0,100,300,500,800][cleared]*level;
+    lines+=cleared;
+    const nl=Math.floor(lines/10)+1;
+    if(nl>level){level=nl;restartTimer();}
+  }
+  piece=nextPiece; nextPiece=newPiece();
+  if(collides(piece,0,0)){
+    over=true;
+    clearInterval(dropTimer);
+    document.getElementById('msg').textContent='GAME OVER — ENTER para reiniciar';
+  }
+  updateHud();
+}
+
+function tick(){
+  if(paused||over)return;
+  if(!collides(piece,0,1))piece.y++;
+  else lock();
+  draw();
+}
+
+function hardDrop(){
+  if(paused||over)return;
+  while(!collides(piece,0,1))piece.y++;
+  lock(); draw();
+}
+
+function move(dx){
+  if(paused||over)return;
+  if(!collides(piece,dx,0))piece.x+=dx;
+  draw();
+}
+
+function softDrop(){
+  if(paused||over)return;
+  if(!collides(piece,0,1)){piece.y++;score+=1;updateHud();}
+  draw();
+}
+
+function cell(ctx,x,y,color,size){
+  ctx.fillStyle=color;
+  ctx.fillRect(x*size,y*size,size,size);
+  ctx.strokeStyle='rgba(255,255,255,.35)';
+  ctx.strokeRect(x*size+1,y*size+1,size-2,size-2);
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  ctx.fillRect(x*size+size-5,y*size+3,3,size-6);
+}
+
+function draw(){
+  cx.fillStyle='#050505';
+  cx.fillRect(0,0,cv.width,cv.height);
+  cx.strokeStyle='rgba(0,255,0,.07)';
+  for(let x=1;x<COLS;x++){cx.beginPath();cx.moveTo(x*SIZE,0);cx.lineTo(x*SIZE,cv.height);cx.stroke();}
+  for(let y=1;y<ROWS;y++){cx.beginPath();cx.moveTo(0,y*SIZE);cx.lineTo(cv.width,y*SIZE);cx.stroke();}
+  board.forEach((row,y)=>row.forEach((c,x)=>{if(c)cell(cx,x,y,c,SIZE);}));
+  // sombra (fantasma)
+  let gy=0;
+  while(!collides(piece,0,gy+1))gy++;
+  cx.globalAlpha=.2;
+  piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+    if(v)cell(cx,piece.x+x,piece.y+y+gy,COLORS[piece.type],SIZE);
+  }));
+  cx.globalAlpha=1;
+  piece.shape.forEach((row,y)=>row.forEach((v,x)=>{
+    if(v&&piece.y+y>=0)cell(cx,piece.x+x,piece.y+y,COLORS[piece.type],SIZE);
+  }));
+  // próxima peça
+  nx.fillStyle='#050505';
+  nx.fillRect(0,0,nv.width,nv.height);
+  const s=nextPiece.shape, sz=20;
+  const ox=(nv.width-s[0].length*sz)/2, oy=(nv.height-s.length*sz)/2;
+  s.forEach((row,y)=>row.forEach((v,x)=>{
+    if(v){
+      nx.save();nx.translate(ox,oy);
+      cell(nx,x,y,COLORS[nextPiece.type],sz);
+      nx.restore();
+    }
+  }));
+}
+
+function updateHud(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('lines').textContent=lines;
+  document.getElementById('level').textContent=level;
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){reset();return;}
+  if(e.key==='p'||e.key==='P'){
+    if(!over){
+      paused=!paused;
+      document.getElementById('msg').textContent=paused?'PAUSADO':'';
+    }
+    return;
+  }
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
+  if(e.key==='ArrowLeft')move(-1);
+  else if(e.key==='ArrowRight')move(1);
+  else if(e.key==='ArrowUp'){if(!paused&&!over){rotate();draw();}}
+  else if(e.key==='ArrowDown')softDrop();
+  else if(e.key===' ')hardDrop();
+});
+
+document.getElementById('bl').onclick=()=>move(-1);
+document.getElementById('br').onclick=()=>move(1);
+document.getElementById('br2').onclick=()=>{if(!paused&&!over){rotate();draw();}};
+document.getElementById('bd').onclick=softDrop;
+document.getElementById('bdrop').onclick=hardDrop;
+
+reset();
+</script>
+</body>
+</html>
