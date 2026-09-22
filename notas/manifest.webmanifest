@@ -1,0 +1,28 @@
+{
+  "name": "Prioriza — bloco de notas com prioridades",
+  "short_name": "Prioriza",
+  "description": "Anote como num bloco de notas e marque cada tarefa com uma etiqueta de prioridade.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./app/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f2ec",
+  "theme_color": "#5a4fcf",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "assets/img/manifest-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/manifest-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

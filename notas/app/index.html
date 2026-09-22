@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5a4fcf">
+<title>Prioriza — Meu bloco de notas</title>
+<meta name="description" content="Bloco de notas com etiquetas de prioridade. Organize tarefas por urgência, agrupe em cadernos e nunca mais perca o que importa.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/app.css">
+<script>
+  // aplica o tema antes da pintura para nao piscar branco no modo escuro
+  (function () {
+    try {
+      var bruto = localStorage.getItem('prioriza:v1');
+      var pref = bruto ? (JSON.parse(bruto).prefs || {}).tema : 'auto';
+      var escuro = pref === 'escuro' ||
+        ((!pref || pref === 'auto') && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.tema = escuro ? 'escuro' : 'claro';
+    } catch (e) { /* segue no claro */ }
+  })();
+</script>
+</head>
+<body>
+
+<!-- ============================================================ icones === -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="i-base" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></g>
+  </defs>
+  <symbol id="ic-busca" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="ic-mais" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="ic-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16.5V22"/><path d="M9 2.5h6l-1 6.2 3 3.1v2.7H7v-2.7l3-3.1z"/></symbol>
+  <symbol id="ic-arquivo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 12h4"/></symbol>
+  <symbol id="ic-lixo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6M10 11v6M14 11v6"/></symbol>
+  <symbol id="ic-copia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></symbol>
+  <symbol id="ic-relogio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="ic-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="ic-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="ic-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="ic-lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+  <symbol id="ic-grade" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="ic-lista" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+  <symbol id="ic-quadro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="5" height="18" rx="1.5"/><rect x="9.5" y="3" width="5" height="12" rx="1.5"/><rect x="16" y="3" width="5" height="15" rx="1.5"/></symbol>
+  <symbol id="ic-engrenagem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6l1.4 2.5 2.8-.5.5 2.8 2.5 1.4-1.5 2.4 1.5 2.4-2.5 1.4-.5 2.8-2.8-.5-1.4 2.5-1.4-2.5-2.8.5-.5-2.8-2.5-1.4L6.3 12 4.8 9.6l2.5-1.4.5-2.8 2.8.5z"/></symbol>
+  <symbol id="ic-teclado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9.5 14h5"/></symbol>
+  <symbol id="ic-baixar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 11l4.5 4.5L16.5 11M4 19.5h16"/></symbol>
+  <symbol id="ic-subir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7.5 8.5L12 4l4.5 4.5M4 19.5h16"/></symbol>
+  <symbol id="ic-voltar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></symbol>
+  <symbol id="ic-fogo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 007-7c0-5-4-6-4-11 0 0-3 2-3 6 0 2-1 3-2 3s-1.5-1-1.5-2C6.5 13 5 13.5 5 15a7 7 0 007 7z"/></symbol>
+  <symbol id="ic-estrela" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></symbol>
+  <symbol id="ic-caderno" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 011 1v16a1 1 0 01-1 1H5a2 2 0 01-2-2V5a2 2 0 012-2z"/><path d="M8 3v18"/></symbol>
+  <symbol id="ic-etiqueta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11V4a1 1 0 011-1h7l10 10-8 8L3 11z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ======================================================== lateral === -->
+  <aside class="lateral" id="lateral">
+    <div class="lateral__topo">
+      <a class="marca" href="../index.html" title="Voltar para a página inicial">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="9" fill="currentColor"/><rect x="9" y="7.5" width="18.5" height="25" rx="2.5" fill="#fdfcf8"/><rect x="12.5" y="13" width="11" height="2" rx="1" fill="#c9c6bd"/><rect x="12.5" y="18" width="11" height="2" rx="1" fill="#c9c6bd"/><rect x="12.5" y="23" width="7" height="2" rx="1" fill="#c9c6bd"/><path d="M25 5h7a1.5 1.5 0 011.5 1.5v12.5l-5-3.1-5 3.1V6.5A1.5 1.5 0 0125 5z" fill="#e5484d"/></svg>
+        <span>Prioriza</span>
+      </a>
+      <button class="icone-btn menu-mobile" id="fecharLateral" style="margin-left:auto" aria-label="Fechar menu">
+        <svg><use href="#ic-x"/></svg>
+      </button>
+    </div>
+
+    <nav class="lateral__corpo">
+      <div class="grupo">
+        <div class="grupo__titulo">Visão geral</div>
+        <div id="filtrosRapidos"></div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo__titulo">
+          Prioridades
+        </div>
+        <div id="filtrosPrioridade"></div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo__titulo">
+          Cadernos
+          <button class="grupo__add" id="novoCaderno" title="Novo caderno" aria-label="Novo caderno">+</button>
+        </div>
+        <div id="listaCadernos"></div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo__titulo">
+          Etiquetas
+          <button class="grupo__add" id="gerenciarEtiquetas" title="Gerenciar etiquetas" aria-label="Gerenciar etiquetas">+</button>
+        </div>
+        <div id="listaEtiquetas"></div>
+      </div>
+
+      <div class="grupo">
+        <div class="grupo__titulo">Guardadas</div>
+        <div id="filtrosGuardados"></div>
+      </div>
+    </nav>
+
+    <div class="lateral__rodape">
+      <button class="perfil" id="abrirConta">
+        <span class="perfil__ava" id="avatar">EU</span>
+        <span class="perfil__txt">
+          <span class="perfil__nome" id="perfilNome">Meu espaço</span>
+          <span class="perfil__plano" id="perfilPlano">Plano Free</span>
+        </span>
+      </button>
+      <button class="icone-btn" id="abrirConfig" title="Configurações" aria-label="Configurações">
+        <svg><use href="#ic-engrenagem"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ======================================================= principal === -->
+  <main class="principal">
+
+    <header class="topo">
+      <button class="icone-btn menu-mobile" id="abrirLateral" aria-label="Abrir menu">
+        <svg><use href="#ic-menu"/></svg>
+      </button>
+
+      <div class="busca">
+        <svg><use href="#ic-busca"/></svg>
+        <input type="search" id="busca" placeholder="Buscar em notas, etiquetas e checklists..." aria-label="Buscar" autocomplete="off">
+        <button class="busca__limpar oculto" id="limparBusca" aria-label="Limpar busca">&times;</button>
+      </div>
+
+      <div class="topo__dir">
+        <button class="icone-btn" id="visGrade" title="Grade" aria-label="Visualização em grade"><svg><use href="#ic-grade"/></svg></button>
+        <button class="icone-btn" id="visLista" title="Lista" aria-label="Visualização em lista"><svg><use href="#ic-lista"/></svg></button>
+        <button class="icone-btn" id="visQuadro" title="Quadro por prioridade" aria-label="Visualização em quadro"><svg><use href="#ic-quadro"/></svg></button>
+        <span class="separador"></span>
+        <button class="icone-btn" id="alternarTema" title="Tema claro/escuro" aria-label="Alternar tema"><svg><use href="#ic-lua"/></svg></button>
+        <button class="icone-btn" id="abrirAtalhos" title="Atalhos de teclado" aria-label="Atalhos de teclado"><svg><use href="#ic-teclado"/></svg></button>
+        <button class="btn btn--principal btn--novo" id="novaNota">
+          <svg><use href="#ic-mais"/></svg><span>Nova nota</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="barra-filtros" id="barraFiltros"></div>
+
+    <div class="conteudo" id="conteudo">
+      <div class="cabecalho">
+        <div>
+          <h1 id="tituloVista">Todas as notas</h1>
+          <p id="subtituloVista">Carregando...</p>
+        </div>
+      </div>
+      <div class="resumo" id="resumo"></div>
+      <div id="area"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ========================================================== cortina === -->
+<div class="cortina" id="cortina"></div>
+
+<!-- =========================================================== editor === -->
+<aside class="editor" id="editor" aria-label="Editor de nota">
+  <div class="editor__topo">
+    <span class="editor__estado" id="editorEstado">Nota</span>
+    <button class="icone-btn" id="editorFixar" title="Fixar nota" aria-label="Fixar nota"><svg><use href="#ic-pin"/></svg></button>
+    <button class="icone-btn" id="editorDuplicar" title="Duplicar" aria-label="Duplicar nota"><svg><use href="#ic-copia"/></svg></button>
+    <button class="icone-btn" id="editorFechar" title="Fechar (Esc)" aria-label="Fechar editor"><svg><use href="#ic-x"/></svg></button>
+  </div>
+
+  <div class="editor__corpo">
+    <textarea class="editor__titulo" id="editorTitulo" rows="1" placeholder="Título da nota" maxlength="200"></textarea>
+    <textarea class="editor__texto" id="editorTexto" placeholder="Escreva aqui como num bloco de notas…"></textarea>
+
+    <div class="campo">
+      <span class="campo__rot">Etiqueta de prioridade</span>
+      <div class="prio-grade" id="editorPrioridades"></div>
+    </div>
+
+    <div class="campo">
+      <span class="campo__rot">Etiquetas</span>
+      <div class="etq-lista" id="editorEtiquetas"></div>
+      <div class="nova-etq">
+        <input class="entrada" id="novaEtiquetaTxt" placeholder="Criar etiqueta e aplicar..." maxlength="30">
+        <button class="btn btn--fantasma btn--pequeno" id="novaEtiquetaBtn">Criar</button>
+      </div>
+    </div>
+
+    <div class="campo">
+      <span class="campo__rot">Caderno e prazo</span>
+      <div class="linha-campos">
+        <select class="entrada" id="editorCaderno" aria-label="Caderno"></select>
+        <input class="entrada" type="date" id="editorPrazo" aria-label="Prazo">
+      </div>
+      <div class="prazo-rapido">
+        <button class="chip" data-prazo="0">Hoje</button>
+        <button class="chip" data-prazo="1">Amanhã</button>
+        <button class="chip" data-prazo="7">Em 7 dias</button>
+        <button class="chip" data-prazo="">Sem prazo</button>
+      </div>
+    </div>
+
+    <div class="campo">
+      <span class="campo__rot">Checklist <span id="editorChkContador" style="text-transform:none;letter-spacing:0"></span></span>
+      <div class="checklist" id="editorChecklist"></div>
+      <div class="nova-etq">
+        <input class="entrada" id="novoItemTxt" placeholder="Adicionar item e pressionar Enter" maxlength="140">
+        <button class="btn btn--fantasma btn--pequeno" id="novoItemBtn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor__rodape">
+    <button class="btn btn--fantasma btn--pequeno" id="editorArquivar">
+      <svg><use href="#ic-arquivo"/></svg> Arquivar
+    </button>
+    <button class="btn btn--perigo btn--pequeno" id="editorExcluir">
+      <svg><use href="#ic-lixo"/></svg> Excluir
+    </button>
+    <span class="editor__meta" id="editorMeta"></span>
+  </div>
+</aside>
+
+<!-- =========================================================== modais === -->
+
+<div class="modal-fundo" id="modalAtalhos">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tAtalhos">
+    <div class="modal__topo"><h2 id="tAtalhos">Atalhos de teclado</h2>
+      <button class="icone-btn" data-fechar-modal aria-label="Fechar"><svg><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal__corpo">
+      <div class="atalhos">
+        <div class="atalho"><kbd>N</kbd> Nova nota</div>
+        <div class="atalho"><kbd>/</kbd> Focar na busca</div>
+        <div class="atalho"><kbd>Esc</kbd> Fechar painel</div>
+        <div class="atalho"><kbd>E</kbd> Alternar tema</div>
+        <div class="atalho"><kbd>1</kbd>–<kbd>5</kbd> Prioridade (no editor)</div>
+        <div class="atalho"><kbd>G</kbd> Grade</div>
+        <div class="atalho"><kbd>L</kbd> Lista</div>
+        <div class="atalho"><kbd>Q</kbd> Quadro</div>
+        <div class="atalho"><kbd>?</kbd> Esta janela</div>
+        <div class="atalho"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> Concluir nota aberta</div>
+      </div>
+    </div>
+    <div class="modal__rodape"><button class="btn btn--fantasma" data-fechar-modal>Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-fundo" id="modalConfig">
+  <div class="modal modal--largo" role="dialog" aria-modal="true" aria-labelledby="tConfig">
+    <div class="modal__topo"><h2 id="tConfig">Configurações</h2>
+      <button class="icone-btn" data-fechar-modal aria-label="Fechar"><svg><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal__corpo">
+      <div class="campo" style="margin-top:0">
+        <span class="campo__rot">Seu espaço</span>
+        <input class="entrada" id="cfgNome" placeholder="Como devemos te chamar?" maxlength="40">
+      </div>
+
+      <div class="campo">
+        <span class="campo__rot">Tema</span>
+        <div class="seg" id="cfgTema">
+          <button data-tema="claro">Claro</button>
+          <button data-tema="escuro">Escuro</button>
+          <button data-tema="auto">Sistema</button>
+        </div>
+      </div>
+
+      <div class="campo">
+        <span class="campo__rot">Cadernos</span>
+        <div class="lista-gerencia" id="cfgCadernos"></div>
+        <div class="nova-etq">
+          <input class="entrada" id="cfgNovoCaderno" placeholder="Nome do novo caderno" maxlength="30">
+          <button class="btn btn--fantasma btn--pequeno" id="cfgAddCaderno">Criar</button>
+        </div>
+      </div>
+
+      <div class="campo">
+        <span class="campo__rot">Etiquetas</span>
+        <div class="lista-gerencia" id="cfgEtiquetas"></div>
+        <div class="nova-etq">
+          <input class="entrada" id="cfgNovaEtiqueta" placeholder="Nome da nova etiqueta" maxlength="30">
+          <button class="btn btn--fantasma btn--pequeno" id="cfgAddEtiqueta">Criar</button>
+        </div>
+      </div>
+
+      <div class="campo">
+        <span class="campo__rot">Seus dados</span>
+        <p class="aviso" id="avisoDados">
+          Seus dados ficam gravados apenas neste navegador (armazenamento local) — nada é enviado
+          para servidor nenhum. Faça um backup antes de limpar o navegador ou trocar de aparelho.
+        </p>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn--fantasma btn--pequeno" id="cfgExportar"><svg><use href="#ic-baixar"/></svg> Exportar backup</button>
+          <button class="btn btn--fantasma btn--pequeno" id="cfgImportar"><svg><use href="#ic-subir"/></svg> Importar backup</button>
+          <button class="btn btn--perigo btn--pequeno" id="cfgApagar"><svg><use href="#ic-lixo"/></svg> Apagar tudo</button>
+          <input type="file" id="arquivoImport" accept="application/json,.json" class="oculto">
+        </div>
+      </div>
+    </div>
+    <div class="modal__rodape"><button class="btn btn--principal" data-fechar-modal>Pronto</button></div>
+  </div>
+</div>
+
+<div class="modal-fundo" id="modalConfirma">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tConfirma">
+    <div class="modal__topo"><h2 id="tConfirma">Confirmar</h2></div>
+    <div class="modal__corpo"><p id="confirmaTexto" style="font-size:13.5px;color:var(--tinta-media);line-height:1.6"></p></div>
+    <div class="modal__rodape">
+      <button class="btn btn--fantasma" id="confirmaNao">Cancelar</button>
+      <button class="btn btn--perigo" id="confirmaSim">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/app.js"></script>
+</body>
+</html>
