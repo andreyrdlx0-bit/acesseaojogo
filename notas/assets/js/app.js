@@ -1348,6 +1348,107 @@
     });
 
     ligarArrasto();
+    ligarInstalacao();
+  }
+
+  /* ========================================================== instalação */
+
+  /*
+   * Instalar na tela inicial. O Chrome no Android avisa quando dá, pelo
+   * evento beforeinstallprompt. O Safari no iPhone não avisa nada e não
+   * tem API: lá o único caminho é ensinar o gesto, então o botão aparece
+   * do mesmo jeito e abre o passo a passo.
+   */
+
+  function ehIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function jaInstalado() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+      navigator.standalone === true;
+  }
+
+  function passosInstalacao() {
+    if (ehIOS()) {
+      return '<p class="aviso">No iPhone e no iPad a instalação é pelo Safari — outros navegadores ' +
+        'não conseguem adicionar à tela de início.</p>' +
+        '<ol style="margin:16px 0 0 18px;display:flex;flex-direction:column;gap:10px;font-size:13.8px;line-height:1.55">' +
+        '<li>Toque em <b>Compartilhar</b> — o quadrado com a seta para cima, na barra de baixo.</li>' +
+        '<li>Role a lista e toque em <b>Adicionar à Tela de Início</b>.</li>' +
+        '<li>Toque em <b>Adicionar</b>, no canto superior direito.</li>' +
+        '</ol>';
+    }
+    if (/Android/.test(navigator.userAgent)) {
+      return '<ol style="margin:0 0 0 18px;display:flex;flex-direction:column;gap:10px;font-size:13.8px;line-height:1.55">' +
+        '<li>Toque no menu do navegador — os três pontinhos no canto.</li>' +
+        '<li>Escolha <b>Instalar aplicativo</b> (ou <b>Adicionar à tela inicial</b>).</li>' +
+        '<li>Confirme em <b>Instalar</b>.</li>' +
+        '</ol>';
+    }
+    return '<ol style="margin:0 0 0 18px;display:flex;flex-direction:column;gap:10px;font-size:13.8px;line-height:1.55">' +
+      '<li>Na barra de endereço, clique no ícone de instalar — uma telinha com uma seta.</li>' +
+      '<li>Se não aparecer, abra o menu do navegador e procure <b>Instalar Prioriza</b>.</li>' +
+      '</ol>';
+  }
+
+  var CHAVE_DISPENSOU = 'prioriza:instalar-dispensado';
+
+  function dispensou() {
+    try { return localStorage.getItem(CHAVE_DISPENSOU) === '1'; }
+    catch (e) { return false; }
+  }
+
+  function ligarInstalacao() {
+    var grupo = $('#grupoInstalar');
+    var faixa = $('#faixaInstalar');
+    var convite = null;
+
+    // o botão da lateral serve o desktop; a faixa serve o celular (CSS decide qual)
+    function mostrar(valor) {
+      grupo.hidden = !valor;
+      faixa.hidden = !valor || dispensou();
+    }
+
+    if (jaInstalado()) {
+      mostrar(false);
+    } else if (ehIOS()) {
+      mostrar(true); // no iOS nada sinaliza: oferecemos sempre
+    }
+
+    window.addEventListener('beforeinstallprompt', function (ev) {
+      ev.preventDefault();
+      convite = ev;
+      mostrar(true);
+    });
+
+    window.addEventListener('appinstalled', function () {
+      convite = null;
+      mostrar(false);
+      toast('Prioriza instalado. Procure o ícone na sua tela inicial.');
+    });
+
+    function instalar() {
+      if (convite) {
+        convite.prompt();
+        convite.userChoice.then(function (escolha) {
+          if (escolha.outcome === 'accepted') mostrar(false);
+          convite = null;
+        });
+        return;
+      }
+      $('#instalarPassos').innerHTML = passosInstalacao();
+      abrirModal('#modalInstalar');
+    }
+
+    $('#instalarApp').addEventListener('click', instalar);
+    $('#faixaInstalarBtn').addEventListener('click', instalar);
+
+    $('#faixaInstalarX').addEventListener('click', function () {
+      faixa.hidden = true;
+      try { localStorage.setItem(CHAVE_DISPENSOU, '1'); } catch (e) { /* segue sem lembrar */ }
+    });
   }
 
   /* ================================================================ boot */

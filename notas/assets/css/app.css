@@ -68,6 +68,7 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body { height: 100%; }
 
@@ -384,6 +385,38 @@ a { color: var(--marca); }
 .cabecalho { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .cabecalho h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
 .cabecalho p { color: var(--tinta-fraca); font-size: 13px; }
+
+/* ---- faixa de instalação ---- */
+
+/*
+ * No celular a barra lateral fica fechada, então o botão de instalar que mora
+ * nela é invisível justo em quem mais precisa instalar. Esta faixa aparece no
+ * lugar dele em tela estreita; em tela larga vale o botão da lateral.
+ */
+.faixa-instalar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  margin-bottom: 16px;
+  border-radius: var(--raio-g);
+  background: var(--marca-fraca);
+  border: 1px solid color-mix(in srgb, var(--marca) 28%, transparent);
+}
+.faixa-instalar img { border-radius: 8px; flex-shrink: 0; }
+.faixa-instalar__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.faixa-instalar__txt b { font-size: 13.5px; font-weight: 700; color: var(--tinta); }
+.faixa-instalar__txt span { font-size: 12px; color: var(--tinta-media); }
+.faixa-instalar .icone-btn { width: 28px; height: 28px; }
+.faixa-instalar .icone-btn svg { width: 15px; height: 15px; }
+
+@media (min-width: 901px) { .faixa-instalar { display: none; } }
+@media (max-width: 900px) { #grupoInstalar { display: none; } }
+
+/* só nos aparelhos bem estreitos a frase não cabe junto do botão */
+@media (max-width: 360px) {
+  .faixa-instalar__txt span { display: none; }
+}
 
 /* ---- resumo ---- */
 
