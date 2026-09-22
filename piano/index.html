@@ -78,11 +78,26 @@ function startBand(beat,noteList,end){
     tone(band,st(ch[0])/2,at,beat*.9,'triangle',.5);
     if(bt%2===0)ch.forEach(x=>tone(band,st(x),at,beat*1.8,'sine',.09))}}
 function stopBand(){if(band){try{band.gain.setValueAtTime(band.gain.value,AC.currentTime);band.gain.linearRampToValueAtTime(0,AC.currentTime+.3);const b=band;setTimeout(()=>b.disconnect(),400)}catch(e){}band=null}}
+const voices={};
 function playNote(i,bad){
-  if(!AC)return;const t=AC.currentTime,f=bad?FREQ[i]*0.94:FREQ[i];
-  const g=AC.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(bad?.25:.6,t+.005);g.gain.exponentialRampToValueAtTime(.001,t+1.4);g.connect(master);
-  [[1,'triangle',1],[2,'sine',.35],[3,'sine',.12]].forEach(([m,type,v])=>{const o=AC.createOscillator(),og=AC.createGain();o.type=type;o.frequency.value=f*m;og.gain.value=v;o.connect(og);og.connect(g);o.start(t);o.stop(t+1.5)});
+  if(!AC)return;const t=AC.currentTime,f=FREQ[i];
+  if(voices[i])damp(i,.08);
+  const g=AC.createGain(),lp=AC.createBiquadFilter();
+  lp.type='lowpass';lp.frequency.setValueAtTime(f*14,t);lp.frequency.exponentialRampToValueAtTime(f*3,t+1.2);lp.Q.value=.5;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(bad?.45:.7,t+.004);g.gain.exponentialRampToValueAtTime(.25,t+.4);g.gain.exponentialRampToValueAtTime(.001,t+3.5);
+  lp.connect(g);g.connect(master);
+  const oscs=[];
+  [[1,1],[2,.5],[3,.25],[4,.14],[5,.07],[6,.04]].forEach(([m,v])=>{
+    const fm=f*m*Math.sqrt(1+.0004*m*m); // leve inarmonia das cordas
+    [-1.5,1.5].forEach(det=>{const o=AC.createOscillator(),og=AC.createGain();o.type='sine';o.frequency.value=fm;o.detune.value=det;og.gain.value=v/2;o.connect(og);og.connect(lp);o.start(t);o.stop(t+3.6);oscs.push(o)})});
+  // batida do martelo
+  const nb=AC.createBuffer(1,AC.sampleRate*.03,AC.sampleRate),d=nb.getChannelData(0);for(let k=0;k<d.length;k++)d[k]=(Math.random()*2-1)*Math.pow(1-k/d.length,3);
+  const ns=AC.createBufferSource(),nf=AC.createBiquadFilter(),ng=AC.createGain();ns.buffer=nb;nf.type='bandpass';nf.frequency.value=f*4;ng.gain.value=.25;ns.connect(nf);nf.connect(ng);ng.connect(master);ns.start(t);
+  voices[i]={g,oscs};
 }
+function damp(i,time=.35){const v=voices[i];if(!v||!AC)return;const t=AC.currentTime;
+  v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(Math.max(v.g.gain.value,.0001),t);v.g.gain.exponentialRampToValueAtTime(.0001,t+time);
+  v.oscs.forEach(o=>{try{o.stop(t+time+.05)}catch(e){}});delete voices[i]}
 let W,H,DPR,laneW,hitY,notes=[],t0=0,speed=1,playing=false,score=0,combo=0,maxCombo=0,hits=0,judged=0,song,pressed=new Array(LANES).fill(0),fx=[],flash=new Array(LANES).fill(0),endT=0,diff=1;
 const TRAVEL=1.9; // segundos pra nota cair
 function resize(){DPR=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);laneW=W/LANES;hitY=H-Math.max(110,H*.18)}
@@ -111,7 +126,7 @@ function press(l){
     popup(l,perfect?'PERFEITO!':'BOM',perfect?'#5cff8a':'#34e0ff');burst(l)}
   else{combo=0;playNote(l,true);popup(l,'ERROU','#ff4f6d')}
 }
-function release(l){if(l>=0&&l<LANES)pressed[l]=0}
+function release(l){if(l>=0&&l<LANES){pressed[l]=0;damp(l)}}
 function popup(l,txt,c){fx.push({type:'txt',x:(l+.5)*laneW,y:hitY-40,txt,c,life:1})}
 function burst(l){for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,v=2+Math.random()*4;fx.push({type:'p',x:(l+.5)*laneW,y:hitY,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,c:COLORS[l],life:1})}}
 // input
