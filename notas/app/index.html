@@ -9,6 +9,11 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Prioriza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -106,6 +111,12 @@
         <div class="grupo__titulo">Guardadas</div>
         <div id="filtrosGuardados"></div>
       </div>
+
+      <div class="grupo" id="grupoInstalar" hidden>
+        <button class="btn btn--principal" id="instalarApp" style="width:100%;justify-content:center">
+          <svg><use href="#ic-baixar"/></svg> Instalar no celular
+        </button>
+      </div>
     </nav>
 
     <div class="lateral__rodape">
@@ -152,6 +163,16 @@
     <div class="barra-filtros" id="barraFiltros"></div>
 
     <div class="conteudo" id="conteudo">
+      <div class="faixa-instalar" id="faixaInstalar" hidden>
+        <img src="../assets/img/icon-192.png" alt="" width="34" height="34">
+        <div class="faixa-instalar__txt">
+          <b>Instale na tela inicial</b>
+          <span>Abre em tela cheia e funciona sem internet.</span>
+        </div>
+        <button class="btn btn--principal btn--pequeno" id="faixaInstalarBtn">Instalar</button>
+        <button class="icone-btn" id="faixaInstalarX" aria-label="Agora não"><svg><use href="#ic-x"/></svg></button>
+      </div>
+
       <div class="cabecalho">
         <div>
           <h1 id="tituloVista">Todas as notas</h1>
@@ -310,6 +331,16 @@
   </div>
 </div>
 
+<div class="modal-fundo" id="modalInstalar">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tInstalar">
+    <div class="modal__topo"><h2 id="tInstalar">Instalar o Prioriza</h2>
+      <button class="icone-btn" data-fechar-modal aria-label="Fechar"><svg><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal__corpo" id="instalarPassos"></div>
+    <div class="modal__rodape"><button class="btn btn--principal" data-fechar-modal>Entendi</button></div>
+  </div>
+</div>
+
 <div class="modal-fundo" id="modalConfirma">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tConfirma">
     <div class="modal__topo"><h2 id="tConfirma">Confirmar</h2></div>
@@ -325,5 +356,15 @@
 
 <script src="../assets/js/store.js"></script>
 <script src="../assets/js/app.js"></script>
+<script>
+  // escopo /notas/ — cobre esta página e a de apresentação
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', function () {
+      navigator.serviceWorker.register('../sw.js').catch(function () {
+        /* sem HTTPS ou navegador antigo: o app roda igual, só não fica offline */
+      });
+    });
+  }
+</script>
 </body>
 </html>

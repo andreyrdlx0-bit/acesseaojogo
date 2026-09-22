@@ -13,6 +13,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Prioriza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -51,6 +53,7 @@
       <a href="#prioridades">Prioridades</a>
       <a href="#recursos">Recursos</a>
       <a href="#como">Como funciona</a>
+      <a href="#instalar">No celular</a>
       <a href="#planos">Planos</a>
       <a href="#faq">Dúvidas</a>
     </nav>
@@ -268,6 +271,41 @@
   </div>
 </section>
 
+<!-- ============================================================ instalar -->
+<section id="instalar">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">No celular</p>
+      <h2>Vira aplicativo sem passar por loja nenhuma</h2>
+      <p>Dois toques no próprio navegador e o Prioriza ganha ícone na tela inicial, abre em tela cheia, sem barra de endereço — e funciona mesmo sem internet. Nada de Play Store, App Store ou APK.</p>
+    </div>
+
+    <div class="recursos">
+      <div class="recurso">
+        <div class="recurso__icone">🤖</div>
+        <h3>Android</h3>
+        <p>Abra o app no Chrome e toque no botão <b>Instalar no celular</b>, na barra lateral. Se preferir, use o menu de três pontinhos do navegador e escolha <b>Instalar aplicativo</b>.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">🍎</div>
+        <h3>iPhone e iPad</h3>
+        <p>Precisa ser pelo <b>Safari</b> — os outros navegadores do iOS não conseguem. Toque em <b>Compartilhar</b>, role até <b>Adicionar à Tela de Início</b> e confirme em <b>Adicionar</b>.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">💻</div>
+        <h3>Computador</h3>
+        <p>No Chrome ou no Edge aparece um ícone de instalar na barra de endereço. Ele passa a abrir em janela própria, separado das suas abas.</p>
+      </div>
+    </div>
+
+    <p class="nota-secao">
+      Depois de instalado, o app abre sem internet e continua funcionando normalmente — o que você escrever
+      offline fica salvo no aparelho. As notas de cada aparelho são independentes: instalar no celular não
+      traz o que está no computador.
+    </p>
+  </div>
+</section>
+
 <!-- =============================================================== planos -->
 <section id="planos">
   <div class="env">
@@ -326,7 +364,7 @@
       </div>
     </div>
 
-    <p class="nota-planos">
+    <p class="nota-secao" id="avisoCobranca">
       Transparência: hoje no ar está a versão Free completa, que roda inteira no seu navegador —
       sem conta, sem servidor e sem cobrança. Pro e Time são o roteiro do produto e entram quando a
       sincronização na nuvem estiver pronta. Nenhum pagamento é processado nesta página.
@@ -353,11 +391,11 @@
       </details>
       <details>
         <summary>Funciona no celular?</summary>
-        <p>Sim. O layout se adapta à tela pequena, a barra lateral vira um menu deslizante e dá para instalar como aplicativo pela opção “Adicionar à tela de início” do navegador. Lembrando que as notas do celular e as do computador são separadas enquanto a sincronização não existir.</p>
+        <p>Sim, e dá para instalar como aplicativo de verdade: ícone na tela inicial, tela cheia, sem barra de navegador. O passo a passo de cada sistema está <a href="#instalar">logo acima</a>. Lembrando que as notas do celular e as do computador são separadas enquanto a sincronização não existir.</p>
       </details>
       <details>
         <summary>Dá para usar sem internet?</summary>
-        <p>Depois que a página carrega uma vez, o app funciona offline: tudo é processado no navegador. A única coisa que vem da internet é a fonte de texto, e sem ela o app continua funcionando normalmente com a fonte do sistema.</p>
+        <p>Dá. Na primeira visita o app guarda os próprios arquivos no aparelho, então depois disso ele abre e funciona no modo avião — inclusive instalado na tela inicial. Nada do que você escreve precisa de conexão, porque tudo é processado no próprio navegador.</p>
       </details>
       <details>
         <summary>Posso mudar as cores ou criar outras prioridades?</summary>
@@ -397,6 +435,17 @@
     </nav>
   </div>
 </footer>
+
+<script>
+  // escopo /notas/ — vale para esta página e para o app
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {
+        /* sem HTTPS ou navegador antigo: a página roda igual, só não fica offline */
+      });
+    });
+  }
+</script>
 
 <script>
 (function () {

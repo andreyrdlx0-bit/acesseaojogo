@@ -401,7 +401,7 @@ kbd {
 .plano li.off svg { color: var(--tinta-fraca); opacity: .6; }
 .plano .btn { width: 100%; }
 
-.nota-planos {
+.nota-secao {
   margin-top: 22px;
   text-align: center;
   font-size: 12.8px;
