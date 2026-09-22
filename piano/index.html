@@ -56,8 +56,28 @@ const SONGS=[
  {name:'Mary Had a Little Lamb',bpm:120,s:'E1 D1 C1 D1 E1 E1 E2 D1 D1 D2 E1 G1 G2 E1 D1 C1 D1 E1 E1 E1 E1 D1 D1 E1 D1 C4'},
  {name:'Escala Relâmpago ⚡',bpm:160,s:'C.5 D.5 E.5 F.5 G.5 A.5 B.5 c.5 c.5 B.5 A.5 G.5 F.5 E.5 D.5 C.5 C.5 E.5 G.5 c.5 G.5 E.5 C1 D.5 F.5 A.5 c.5 A.5 F.5 D1 C.5 E.5 D.5 F.5 E.5 G.5 F.5 A.5 G.5 B.5 A.5 c.5 c2'}
 ];
-let AC,master;
-function audio(){if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.35;master.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}
+let AC,master,band=null;
+function audio(){
+  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){} // iPhone: toca mesmo no modo silencioso
+  if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.5;master.connect(AC.destination);
+    const b=AC.createBuffer(1,1,22050),src=AC.createBufferSource();src.buffer=b;src.connect(AC.destination);src.start(0)} // desbloqueio iOS
+  if(AC.state==='suspended')AC.resume()}
+// música de fundo: baixo + acordes + bateria, sincronizada com as notas
+function tone(out,f,t,dur,type,vol){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+.05)}
+function drum(out,t,kind){
+  if(kind==='k'){const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.15);g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);o.connect(g);g.connect(out);o.start(t);o.stop(t+.25)}
+  else{const len=kind==='s'?.15:.04,b=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);
+    const src=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();src.buffer=b;f.type='highpass';f.frequency.value=kind==='s'?1500:7000;g.gain.value=kind==='s'?.35:.15;src.connect(f);f.connect(g);g.connect(out);src.start(t)}}
+const CHORD={0:[0,4,7],1:[5,9,12],2:[0,4,7],3:[5,9,12],4:[7,11,14],5:[5,9,12],6:[7,11,14],7:[0,4,7]}; // acorde por nota da melodia
+function startBand(beat,noteList,end){
+  stopBand();band=AC.createGain();band.gain.value=.45;band.connect(master);
+  const base=AC.currentTime,C3=130.81,st=x=>C3*Math.pow(2,x/12);
+  for(let bt=0,t=2.2;t<end-1;t+=beat,bt++){const at=base+t;
+    drum(band,at,'h');drum(band,at+beat/2,'h');drum(band,at,bt%2?'s':'k');
+    const cur=noteList.filter(n=>n.t<=t+.01).pop()||noteList[0];const ch=CHORD[cur.lane];
+    tone(band,st(ch[0])/2,at,beat*.9,'triangle',.5);
+    if(bt%2===0)ch.forEach(x=>tone(band,st(x),at,beat*1.8,'sine',.09))}}
+function stopBand(){if(band){try{band.gain.setValueAtTime(band.gain.value,AC.currentTime);band.gain.linearRampToValueAtTime(0,AC.currentTime+.3);const b=band;setTimeout(()=>b.disconnect(),400)}catch(e){}band=null}}
 function playNote(i,bad){
   if(!AC)return;const t=AC.currentTime,f=bad?FREQ[i]*0.94:FREQ[i];
   const g=AC.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(bad?.25:.6,t+.005);g.gain.exponentialRampToValueAtTime(.001,t+1.4);g.connect(master);
@@ -71,11 +91,11 @@ function now(){return (performance.now()-t0)/1000}
 function start(s){
   audio();song=s;notes=[];let beat=60/(s.bpm*diff),time=2.2;
   s.s.trim().split(/\s+/).forEach(tok=>{const n=tok[0],b=parseFloat(tok.slice(1))||1;if(n!=='-')notes.push({lane:N[n],t:time,hit:false,miss:false});time+=b*beat});
-  endT=time+1.5;score=combo=maxCombo=hits=judged=0;fx=[];t0=performance.now();playing=true;
+  endT=time+1.5;startBand(beat,notes,endT);score=combo=maxCombo=hits=judged=0;fx=[];t0=performance.now();playing=true;
   document.getElementById('menu').classList.add('hide');document.getElementById('hud').classList.remove('hide');
 }
 function finish(){
-  playing=false;const acc=notes.length?Math.round(hits/notes.length*100):0;
+  playing=false;stopBand();const acc=notes.length?Math.round(hits/notes.length*100):0;
   const stars=acc>=95?'⭐⭐⭐':acc>=80?'⭐⭐':acc>=50?'⭐':'💀';
   document.getElementById('result').innerHTML=`<b>${song.name}</b><br>${stars}<br>Pontos: <b>${score}</b> · Precisão: <b>${acc}%</b> · Combo máx: <b>${maxCombo}</b>`;
   document.getElementById('menu').classList.remove('hide');document.getElementById('hud').classList.add('hide');
