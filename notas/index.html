@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5a4fcf">
+<title>Prioriza — O bloco de notas que mostra o que vem primeiro</title>
+<meta name="description" content="Anote como num bloco de notas e marque cada tarefa com uma etiqueta de prioridade. Urgente, alta, média, baixa: você bate o olho e sabe o que fazer agora.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Prioriza — O bloco de notas que mostra o que vem primeiro">
+<meta property="og:description" content="Anote como num bloco de notas e marque cada tarefa com uma etiqueta de prioridade. Grátis, funciona offline e sem cadastro.">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/landing.css">
+<script>
+  (function () {
+    try {
+      var bruto = localStorage.getItem('prioriza:v1');
+      var pref = bruto ? (JSON.parse(bruto).prefs || {}).tema : localStorage.getItem('prioriza:tema');
+      var escuro = pref === 'escuro' ||
+        ((!pref || pref === 'auto') && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.tema = escuro ? 'escuro' : 'claro';
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="ic-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="ic-seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12.5 5.5L19 12l-6.5 6.5"/></symbol>
+  <symbol id="ic-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="ic-lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></symbol>
+</svg>
+
+<!-- ================================================================ topo -->
+<header class="cabeca" id="cabeca">
+  <div class="env cabeca__int">
+    <a class="marca" href="./" aria-label="Prioriza, página inicial">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="9" fill="currentColor"/><rect x="9" y="7.5" width="18.5" height="25" rx="2.5" fill="#fdfcf8"/><rect x="12.5" y="13" width="11" height="2" rx="1" fill="#c9c6bd"/><rect x="12.5" y="18" width="11" height="2" rx="1" fill="#c9c6bd"/><rect x="12.5" y="23" width="7" height="2" rx="1" fill="#c9c6bd"/><path d="M25 5h7a1.5 1.5 0 011.5 1.5v12.5l-5-3.1-5 3.1V6.5A1.5 1.5 0 0125 5z" fill="#e5484d"/></svg>
+      <span>Prioriza</span>
+    </a>
+
+    <nav class="nav">
+      <a href="#prioridades">Prioridades</a>
+      <a href="#recursos">Recursos</a>
+      <a href="#como">Como funciona</a>
+      <a href="#planos">Planos</a>
+      <a href="#faq">Dúvidas</a>
+    </nav>
+
+    <div class="cabeca__dir">
+      <button class="icone-btn" id="tema" aria-label="Alternar tema claro e escuro" title="Tema">
+        <svg><use href="#ic-lua"/></svg>
+      </button>
+      <a class="btn btn--principal btn--pequeno" href="app/">Abrir o app</a>
+    </div>
+  </div>
+</header>
+
+<!-- ================================================================ hero -->
+<section class="hero">
+  <div class="env hero__int">
+    <span class="selo">✦ <b>Grátis</b> · sem cadastro · funciona offline</span>
+
+    <h1>Seu bloco de notas, agora com <span class="destaque">prioridade</span>.</h1>
+
+    <p class="linha-fina">
+      Escreva do jeito que você sempre escreveu — solto, rápido, sem formulário. A diferença
+      é a etiqueta colorida em cada nota: urgente, alta, média ou baixa. Você bate o olho
+      na tela e já sabe o que fazer agora.
+    </p>
+
+    <div class="hero__acoes">
+      <a class="btn btn--principal btn--grande" href="app/?nova=1">
+        Começar a anotar <svg><use href="#ic-seta"/></svg>
+      </a>
+      <a class="btn btn--contorno btn--grande" href="#recursos">Ver o que tem dentro</a>
+    </div>
+    <p class="hero__nota">Abre na hora. Suas notas ficam no seu navegador.</p>
+
+    <!-- prévia do app -->
+    <div class="vitrine" aria-label="Prévia da tela do aplicativo">
+      <div class="vitrine__barra">
+        <span class="vitrine__bola" style="background:#ff5f57"></span>
+        <span class="vitrine__bola" style="background:#febc2e"></span>
+        <span class="vitrine__bola" style="background:#28c840"></span>
+        <span class="vitrine__url">prioriza · meu espaço</span>
+      </div>
+      <div class="vitrine__corpo">
+        <div class="mock-lateral">
+          <div class="mock-titulo">Visão geral</div>
+          <div class="mock-item on">📄 Todas as notas <b>12</b></div>
+          <div class="mock-item">🎯 Para hoje <b>3</b></div>
+          <div class="mock-item">🔥 Atrasadas <b>1</b></div>
+          <div class="mock-titulo">Prioridades</div>
+          <div class="mock-item"><i style="background:#e5484d"></i> Urgente <b>2</b></div>
+          <div class="mock-item"><i style="background:#f76808"></i> Alta <b>4</b></div>
+          <div class="mock-item"><i style="background:#eaa900"></i> Média <b>3</b></div>
+          <div class="mock-item"><i style="background:#3e8fd6"></i> Baixa <b>3</b></div>
+          <div class="mock-titulo">Cadernos</div>
+          <div class="mock-item"><i style="background:#5a4fcf"></i> Trabalho <b>7</b></div>
+          <div class="mock-item"><i style="background:#2f9e6b"></i> Pessoal <b>5</b></div>
+        </div>
+
+        <div class="mock-notas">
+          <article class="mock-nota" style="--c:#e5484d">
+            <h4>Fechar proposta do cliente novo</h4>
+            <p>Revisar escopo, ajustar valores e enviar até o fim do dia.</p>
+            <div class="fila">
+              <span class="tag" style="background:#e5484d1f;color:#e5484d"><i></i>Urgente</span>
+              <span class="tag" style="background:#e5484d1f;color:#e5484d">Hoje</span>
+            </div>
+          </article>
+
+          <article class="mock-nota" style="--c:#f76808">
+            <h4>Pagar contas do mês</h4>
+            <p>Luz, internet e cartão. Conferir o boleto da internet.</p>
+            <div class="fila">
+              <span class="tag" style="background:#f768081f;color:#f76808"><i></i>Alta</span>
+              <span class="tag" style="background:#0d94881f;color:#0d9488"><i></i>Financeiro</span>
+            </div>
+          </article>
+
+          <article class="mock-nota" style="--c:#eaa900">
+            <h4>Estudar 1 capítulo do curso</h4>
+            <p>Capítulo 4 — funis de venda. Fazer os exercícios no fim.</p>
+            <div class="fila">
+              <span class="tag" style="background:#eaa9001f;color:#b98700"><i></i>Média</span>
+              <span class="tag" style="background:#3e8fd61f;color:#3e8fd6">Em 5 dias</span>
+            </div>
+          </article>
+
+          <article class="mock-nota feita" style="--c:#9a978e">
+            <h4>Organizar a mesa de trabalho</h4>
+            <p>Trocar o cabo da luminária e jogar fora os papéis velhos.</p>
+            <div class="fila">
+              <span class="tag" style="background:#2f9e6b1f;color:#2f9e6b"><i></i>Concluída</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================================================= prioridades -->
+<section class="faixa" id="prioridades">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">Etiquetas de prioridade</p>
+      <h2>Cinco cores. Zero dúvida sobre o que vem primeiro.</h2>
+      <p>Cada nota recebe uma etiqueta. A cor aparece na borda do cartão, na lista lateral e no quadro — dá pra ler a sua semana inteira sem abrir nada.</p>
+    </div>
+
+    <div class="prioridades">
+      <div class="prio-card" style="--c:#e5484d">
+        <span class="tag" style="background:#e5484d1f;color:#e5484d"><i></i>Urgente</span>
+        <p>Resolve hoje ou a coisa desanda. Sobe sozinha para o topo de qualquer lista.</p>
+      </div>
+      <div class="prio-card" style="--c:#f76808">
+        <span class="tag" style="background:#f768081f;color:#f76808"><i></i>Alta</span>
+        <p>Importa de verdade, mas ainda cabe no dia. Fica logo abaixo das urgentes.</p>
+      </div>
+      <div class="prio-card" style="--c:#eaa900">
+        <span class="tag" style="background:#eaa9001f;color:#b98700"><i></i>Média</span>
+        <p>Entra na semana. É o miolo da lista, onde vive a maior parte das tarefas.</p>
+      </div>
+      <div class="prio-card" style="--c:#3e8fd6">
+        <span class="tag" style="background:#3e8fd61f;color:#3e8fd6"><i></i>Baixa</span>
+        <p>Seria bom fazer. Fica guardada sem atrapalhar o que é importante.</p>
+      </div>
+      <div class="prio-card" style="--c:#9a978e">
+        <span class="tag" style="background:#9a978e1f;color:#77746c"><i></i>Sem prioridade</span>
+        <p>Ideia solta, rascunho, lembrete. Nem tudo que você anota é tarefa.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= recursos -->
+<section id="recursos">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">Recursos</p>
+      <h2>Simples como papel. Organizado como precisa ser.</h2>
+      <p>Tudo que um bloco de notas deveria ter quando as anotações viram tarefa de verdade.</p>
+    </div>
+
+    <div class="recursos">
+      <div class="recurso">
+        <div class="recurso__icone">🏷️</div>
+        <h3>Etiquetas livres além da prioridade</h3>
+        <p>Crie etiquetas próprias — Reunião, Financeiro, Ideia, o que for — com cor automática. Uma nota pode ter quantas você quiser, e a barra lateral filtra por qualquer uma delas.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">📓</div>
+        <h3>Cadernos para separar mundos</h3>
+        <p>Trabalho num caderno, pessoal em outro, estudos num terceiro. Cada caderno tem sua cor e seu contador, e você troca com um clique sem perder o filtro de prioridade.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">✅</div>
+        <h3>Checklist dentro da nota</h3>
+        <p>Quebre uma tarefa grande em passos. O cartão mostra a barra de progresso (2/5) sem precisar abrir, então dá pra ver de longe o que já andou.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">📅</div>
+        <h3>Prazos que avisam sozinhos</h3>
+        <p>Marque hoje, amanhã ou em 7 dias num toque. O que passou do prazo fica vermelho na hora, e as visões “Para hoje” e “Atrasadas” já vêm prontas.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">🗂️</div>
+        <h3>Três jeitos de olhar a mesma lista</h3>
+        <p>Grade de cartões quando quer ler o conteúdo, lista enxuta quando quer velocidade, e quadro por prioridade — onde você arrasta a nota de “baixa” para “urgente”.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">🔍</div>
+        <h3>Busca que entra no texto</h3>
+        <p>Procura no título, no corpo da nota, nos itens do checklist e até no nome das etiquetas. O trecho encontrado vem marcado em amarelo no resultado.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">🌙</div>
+        <h3>Claro, escuro ou como o sistema</h3>
+        <p>Tema escuro de verdade, com as cores de prioridade recalibradas para não queimar a vista de noite. Tecla <kbd>E</kbd> alterna na hora.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">⌨️</div>
+        <h3>Atalhos para quem digita rápido</h3>
+        <p><kbd>N</kbd> abre nota nova, <kbd>/</kbd> foca na busca, <kbd>1</kbd> a <kbd>5</kbd> trocam a prioridade sem tirar a mão do teclado. Aperte <kbd>?</kbd> para ver todos.</p>
+      </div>
+      <div class="recurso">
+        <div class="recurso__icone">💾</div>
+        <h3>Backup que é seu mesmo</h3>
+        <p>Exporte tudo num arquivo JSON quando quiser e importe de volta em qualquer navegador. Sem refém de plataforma, sem exportação capada.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= como -->
+<section class="faixa" id="como">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">Como funciona</p>
+      <h2>Três passos e você já está organizado</h2>
+    </div>
+
+    <div class="passos">
+      <div class="passo">
+        <h3>Anote sem pensar</h3>
+        <p>Clique em “Nova nota” e escreva. Título, texto corrido, quebra de linha — igualzinho ao bloco de notas que você já usa. Nada é obrigatório.</p>
+      </div>
+      <div class="passo">
+        <h3>Marque a prioridade</h3>
+        <p>Um clique na etiqueta certa (ou as teclas 1 a 5). Se quiser, some um prazo, um caderno e as etiquetas que fizerem sentido.</p>
+      </div>
+      <div class="passo">
+        <h3>Deixe a lista se organizar</h3>
+        <p>As urgentes sobem, as atrasadas acendem em vermelho, as concluídas descem riscadas. Você só olha e executa de cima pra baixo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== planos -->
+<section id="planos">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">Planos</p>
+      <h2>Comece de graça. Cresça se precisar.</h2>
+      <p>O essencial é gratuito e não tem prazo de validade.</p>
+    </div>
+
+    <div class="planos">
+      <div class="plano">
+        <h3>Free</h3>
+        <p class="plano__sub">Para organizar a sua vida num aparelho só.</p>
+        <div class="plano__preco"><span class="plano__valor">R$ 0</span><span class="plano__periodo">para sempre</span></div>
+        <ul>
+          <li><svg><use href="#ic-check"/></svg> Notas, cadernos e etiquetas ilimitados</li>
+          <li><svg><use href="#ic-check"/></svg> As 5 etiquetas de prioridade</li>
+          <li><svg><use href="#ic-check"/></svg> Checklists, prazos e notas fixadas</li>
+          <li><svg><use href="#ic-check"/></svg> Grade, lista e quadro arrastável</li>
+          <li><svg><use href="#ic-check"/></svg> Busca, tema escuro e atalhos</li>
+          <li><svg><use href="#ic-check"/></svg> Backup manual em JSON</li>
+        </ul>
+        <a class="btn btn--contorno" href="app/">Abrir agora</a>
+      </div>
+
+      <div class="plano plano--destaque">
+        <span class="plano__fita">Em breve</span>
+        <h3>Pro</h3>
+        <p class="plano__sub">Para quem usa no computador e no celular.</p>
+        <div class="plano__preco"><span class="plano__valor">R$ 19</span><span class="plano__periodo">/mês</span></div>
+        <ul>
+          <li><svg><use href="#ic-check"/></svg> Tudo do Free</li>
+          <li><svg><use href="#ic-check"/></svg> Sincronização entre aparelhos</li>
+          <li><svg><use href="#ic-check"/></svg> Backup automático na nuvem</li>
+          <li><svg><use href="#ic-check"/></svg> Lembretes por e-mail e push</li>
+          <li><svg><use href="#ic-check"/></svg> Histórico de versões da nota</li>
+          <li><svg><use href="#ic-check"/></svg> Anexos e imagens</li>
+        </ul>
+        <a class="btn btn--principal" href="app/">Usar o Free enquanto isso</a>
+      </div>
+
+      <div class="plano">
+        <span class="plano__fita" style="background:var(--tinta-fraca)">Em breve</span>
+        <h3>Time</h3>
+        <p class="plano__sub">Para dividir a lista com outras pessoas.</p>
+        <div class="plano__preco"><span class="plano__valor">R$ 39</span><span class="plano__periodo">/pessoa/mês</span></div>
+        <ul>
+          <li><svg><use href="#ic-check"/></svg> Tudo do Pro</li>
+          <li><svg><use href="#ic-check"/></svg> Cadernos compartilhados</li>
+          <li><svg><use href="#ic-check"/></svg> Atribuir nota a uma pessoa</li>
+          <li><svg><use href="#ic-check"/></svg> Comentários nas notas</li>
+          <li><svg><use href="#ic-check"/></svg> Permissões por caderno</li>
+          <li><svg><use href="#ic-check"/></svg> Relatório de entregas</li>
+        </ul>
+        <a class="btn btn--contorno" href="app/">Avise-me quando sair</a>
+      </div>
+    </div>
+
+    <p class="nota-planos">
+      Transparência: hoje no ar está a versão Free completa, que roda inteira no seu navegador —
+      sem conta, sem servidor e sem cobrança. Pro e Time são o roteiro do produto e entram quando a
+      sincronização na nuvem estiver pronta. Nenhum pagamento é processado nesta página.
+    </p>
+  </div>
+</section>
+
+<!-- ================================================================== faq -->
+<section class="faixa" id="faq">
+  <div class="env">
+    <div class="secao-topo">
+      <p class="olho">Dúvidas</p>
+      <h2>O que costumam perguntar</h2>
+    </div>
+
+    <div class="faq">
+      <details open>
+        <summary>Onde ficam guardadas as minhas notas?</summary>
+        <p>No armazenamento local do seu próprio navegador. Nada sai do seu aparelho e nenhum servidor recebe o que você escreve. O lado bom: é instantâneo e privado. O lado a cuidar: se você limpar os dados do navegador ou usar uma janela anônima, as notas somem — por isso existe o botão de exportar backup em Configurações.</p>
+      </details>
+      <details>
+        <summary>Preciso criar conta ou informar e-mail?</summary>
+        <p>Não. Você abre o app e já começa a escrever. O campo de nome em Configurações serve só para personalizar o seu espaço na tela.</p>
+      </details>
+      <details>
+        <summary>Funciona no celular?</summary>
+        <p>Sim. O layout se adapta à tela pequena, a barra lateral vira um menu deslizante e dá para instalar como aplicativo pela opção “Adicionar à tela de início” do navegador. Lembrando que as notas do celular e as do computador são separadas enquanto a sincronização não existir.</p>
+      </details>
+      <details>
+        <summary>Dá para usar sem internet?</summary>
+        <p>Depois que a página carrega uma vez, o app funciona offline: tudo é processado no navegador. A única coisa que vem da internet é a fonte de texto, e sem ela o app continua funcionando normalmente com a fonte do sistema.</p>
+      </details>
+      <details>
+        <summary>Posso mudar as cores ou criar outras prioridades?</summary>
+        <p>As cinco prioridades são fixas de propósito — é o que faz você ler a tela no automático, sem interpretar. Para qualquer outra classificação existem as etiquetas livres, que são ilimitadas e ganham cor própria.</p>
+      </details>
+      <details>
+        <summary>Como levo minhas notas para outro computador?</summary>
+        <p>Em Configurações, clique em “Exportar backup” para baixar um arquivo JSON. No outro navegador, abra o app e use “Importar backup”. O arquivo é legível e seu — dá até para versionar no Git se quiser.</p>
+      </details>
+      <details>
+        <summary>Excluí uma nota sem querer. Perdi?</summary>
+        <p>Não. Toda nota excluída vai para a Lixeira e fica lá até você esvaziar. Além disso, logo depois de excluir aparece um aviso com o botão “Desfazer”.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== final -->
+<section>
+  <div class="env">
+    <div class="final">
+      <h2>Pare de decidir o que fazer. Só olhe a cor.</h2>
+      <p>Leva menos de um minuto para escrever a primeira nota e marcar a primeira prioridade.</p>
+      <a class="btn btn--grande" href="app/?nova=1">Abrir o Prioriza de graça</a>
+    </div>
+  </div>
+</section>
+
+<footer class="rodape">
+  <div class="env rodape__int">
+    <p>Prioriza — para quem anota tudo e esquece metade.</p>
+    <nav>
+      <a href="app/">Abrir o app</a>
+      <a href="#recursos">Recursos</a>
+      <a href="#planos">Planos</a>
+      <a href="#faq">Dúvidas</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var raiz = document.documentElement;
+
+  // sombra na barra ao rolar
+  var cabeca = document.getElementById('cabeca');
+  var aoRolar = function () { cabeca.classList.toggle('rolou', window.scrollY > 8); };
+  addEventListener('scroll', aoRolar, { passive: true });
+  aoRolar();
+
+  // botão de tema — escreve na mesma preferência que o app lê
+  var botao = document.getElementById('tema');
+  var pintar = function () {
+    botao.innerHTML = '<svg><use href="#ic-' +
+      (raiz.dataset.tema === 'escuro' ? 'sol' : 'lua') + '"/></svg>';
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = raiz.dataset.tema === 'escuro' ? '#101012' : '#5a4fcf';
+  };
+  pintar();
+
+  botao.addEventListener('click', function () {
+    var novo = raiz.dataset.tema === 'escuro' ? 'claro' : 'escuro';
+    raiz.dataset.tema = novo;
+    pintar();
+    try {
+      localStorage.setItem('prioriza:tema', novo);
+      var bruto = localStorage.getItem('prioriza:v1');
+      if (bruto) {
+        var estado = JSON.parse(bruto);
+        estado.prefs = estado.prefs || {};
+        estado.prefs.tema = novo;
+        localStorage.setItem('prioriza:v1', JSON.stringify(estado));
+      }
+    } catch (e) { /* sem armazenamento: o tema vale só nesta visita */ }
+  });
+})();
+</script>
+</body>
+</html>
