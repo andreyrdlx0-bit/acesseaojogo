@@ -78,6 +78,55 @@ não existe servidor. Consequências que o app deixa explícitas para o usuário
 - em aba anônima ou com armazenamento bloqueado, a gravação falha e o app avisa
   na tela em vez de fingir que salvou.
 
+## Sincronização entre aparelhos (SaaS)
+
+Existe uma camada de nuvem opcional. Ela é **local-first**: o navegador continua
+sendo a fonte da verdade e o app funciona inteiro sem rede — a nuvem sincroniza
+por cima. Se o servidor cair, ninguém percebe; volta a sincronizar depois.
+
+Enquanto `assets/js/config.js` estiver com `url` e `chave` vazias, nada disso
+aparece: nenhuma tela de conta, nenhum dado sai do aparelho, e a biblioteca do
+Supabase (218 KB) nem é baixada.
+
+### Como ligar
+
+1. Criar um projeto no Supabase.
+2. Rodar `backend/001_espacos.sql` no SQL Editor do projeto.
+3. Em Authentication → Providers, deixar e-mail/senha ligado. Desligar
+   "Confirm email" faz a conta valer na hora; deixando ligado, a pessoa precisa
+   clicar no link do e-mail antes de entrar (o app avisa os dois casos).
+4. Preencher `assets/js/config.js` com a URL do projeto e a **chave publicável**.
+
+A chave publicável é pública de propósito: ela só permite o que as políticas de
+RLS autorizam, e elas restringem cada pessoa ao próprio espaço. A chave secreta
+(`service_role`) nunca deve entrar neste arquivo.
+
+### Como os dados ficam guardados
+
+Uma linha por pessoa na tabela `espacos`, com o espaço inteiro num campo `jsonb`
+no mesmo formato que o app usa no navegador. Isso mantém o cliente simples — não
+há camada de tradução entre o que está na tela e o que está no banco.
+
+### Edição em dois aparelhos ao mesmo tempo
+
+A coluna `versao` sobe a cada gravação. Se o celular grava enquanto o computador
+ainda estava na versão anterior, a função `salvar_espaco` devolve `conflito` com
+os dados do servidor em vez de deixar um sobrescrever o outro. O cliente então
+junta os dois espaços:
+
+- **Notas** — união por id; vence a de `atualizadaEm` mais recente.
+- **Apagadas de vez** — cada exclusão definitiva deixa uma *lápide* (`removidas`)
+  com id e data. Sem isso, apagar uma nota no celular seria desfeito pelo
+  computador na sincronização seguinte. Uma edição posterior à lápide ganha,
+  para não perder trabalho; no empate exato de horário, apagar vence. Lápides
+  expiram em 90 dias.
+- **Cadernos e etiquetas** — união por id; no empate vale a versão local.
+- **Preferências** — ficam com o aparelho. Tema e visualização são escolha de
+  quem está nesta tela, não algo a herdar de outro aparelho.
+
+A junção é testável isoladamente: `Nuvem.juntar(local, remoto)` é uma função
+pura, sem rede.
+
 ## Trocando o `localStorage` por um backend
 
 `store.js` isola toda a persistência num **adaptador** com três métodos assíncronos.

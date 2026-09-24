@@ -101,6 +101,9 @@
       cadernos: [],
       etiquetas: [],
       notas: [],
+      // ids apagados de vez, com a data. Sem esta lista, juntar dois aparelhos
+      // ressuscitaria o que foi apagado num deles.
+      removidas: [],
       prefs: {
         tema: 'auto',
         visualizacao: 'grade',
@@ -223,6 +226,9 @@
       prefs: Object.assign({}, base.prefs, estado.prefs || {}),
       cadernos: Array.isArray(estado.cadernos) ? estado.cadernos : [],
       etiquetas: Array.isArray(estado.etiquetas) ? estado.etiquetas : [],
+      removidas: (Array.isArray(estado.removidas) ? estado.removidas : [])
+        .filter(function (r) { return r && r.id && r.em; })
+        .map(function (r) { return { id: String(r.id), em: String(r.em) }; }),
       notas: []
     };
 
@@ -410,16 +416,24 @@
       return this.atualizarNota(id, { naLixeira: false, arquivada: false });
     },
 
+    _marcarRemovida: function (id) {
+      if (!Array.isArray(this.estado.removidas)) this.estado.removidas = [];
+      this.estado.removidas.push({ id: id, em: agora() });
+    },
+
     excluirDefinitivamente: function (id) {
       this.estado.notas = this.estado.notas.filter(function (n) { return n.id !== id; });
+      this._marcarRemovida(id);
       this.commit();
     },
 
     esvaziarLixeira: function () {
-      var removidas = this.estado.notas.filter(function (n) { return n.naLixeira; }).length;
+      var self = this;
+      var indo = this.estado.notas.filter(function (n) { return n.naLixeira; });
+      indo.forEach(function (n) { self._marcarRemovida(n.id); });
       this.estado.notas = this.estado.notas.filter(function (n) { return !n.naLixeira; });
       this.commit();
-      return removidas;
+      return indo.length;
     },
 
     duplicarNota: function (id) {
@@ -578,6 +592,13 @@
       var pacote = JSON.parse(texto);
       var dados = pacote && pacote.dados ? pacote.dados : pacote;
       this.estado = normalizar(dados);
+      this.commit();
+      return this.estado;
+    },
+
+    /* Troca o estado inteiro — usado quando a nuvem devolve o espaço juntado. */
+    substituirEstado: function (novo) {
+      this.estado = normalizar(novo);
       this.commit();
       return this.estado;
     },
