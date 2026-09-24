@@ -124,7 +124,9 @@
         <span class="perfil__ava" id="avatar">EU</span>
         <span class="perfil__txt">
           <span class="perfil__nome" id="perfilNome">Meu espaço</span>
-          <span class="perfil__plano" id="perfilPlano">Plano Free</span>
+          <span class="perfil__plano" id="perfilPlano">
+            <i class="sync-ponto" id="syncPonto" hidden></i><span id="perfilPlanoTxt">Plano Free</span>
+          </span>
         </span>
       </button>
       <button class="icone-btn" id="abrirConfig" title="Configurações" aria-label="Configurações">
@@ -331,6 +333,15 @@
   </div>
 </div>
 
+<div class="modal-fundo" id="modalConta">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tConta">
+    <div class="modal__topo"><h2 id="tConta">Sua conta</h2>
+      <button class="icone-btn" data-fechar-modal aria-label="Fechar"><svg><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal__corpo" id="contaCorpo"></div>
+  </div>
+</div>
+
 <div class="modal-fundo" id="modalInstalar">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tInstalar">
     <div class="modal__topo"><h2 id="tInstalar">Instalar o Prioriza</h2>
@@ -354,7 +365,9 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+<script src="../assets/js/config.js"></script>
 <script src="../assets/js/store.js"></script>
+<script src="../assets/js/nuvem.js"></script>
 <script src="../assets/js/app.js"></script>
 <script>
   // escopo /notas/ — cobre esta página e a de apresentação

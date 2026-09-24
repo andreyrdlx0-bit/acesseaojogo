@@ -6,6 +6,7 @@
   'use strict';
 
   var Store = window.Store;
+  var Nuvem = window.Nuvem; // ausente se nuvem.js não carregar: o app segue local
 
   /* =============================================================== utils */
 
@@ -193,7 +194,8 @@
     notaAberta: null,
     arrastando: null,
     confirmarResolve: null,
-    salvarTimer: null
+    salvarTimer: null,
+    syncTexto: null
   };
 
   /* ============================================================== toasts */
@@ -290,7 +292,9 @@
     var nome = Store.estado.perfil.nome || 'Meu espaço';
     $('#perfilNome').textContent = nome;
     $('#avatar').textContent = nome.trim().slice(0, 2).toUpperCase();
-    $('#perfilPlano').textContent = 'Plano ' + (Store.estado.perfil.plano === 'pro' ? 'Pro' : 'Free');
+    if (!ui.syncTexto) {
+      $('#perfilPlanoTxt').textContent = 'Plano ' + (Store.estado.perfil.plano === 'pro' ? 'Pro' : 'Free');
+    }
   }
 
   function renderBarraFiltros() {
@@ -1140,6 +1144,11 @@
     /* --- configurações --- */
     $('#abrirConfig').addEventListener('click', function () { sincronizarConfig(); abrirModal('#modalConfig'); });
     $('#abrirConta').addEventListener('click', function () {
+      if (Nuvem && Nuvem.configurada()) {
+        renderConta();
+        abrirModal('#modalConta');
+        return;
+      }
       sincronizarConfig();
       abrirModal('#modalConfig');
       setTimeout(function () { $('#cfgNome').focus(); }, 120);
@@ -1351,6 +1360,157 @@
     ligarInstalacao();
   }
 
+  /* =============================================================== conta */
+
+  var ROTULOS_SYNC = {
+    sincronizando: { cor: 'var(--p-media)',     texto: 'Sincronizando…', girando: true },
+    ok:            { cor: 'var(--ok)',          texto: 'Sincronizado' },
+    offline:       { cor: 'var(--tinta-fraca)', texto: 'Sem conexão' },
+    erro:          { cor: 'var(--p-urgente)',   texto: 'Erro ao sincronizar' },
+    deslogado:     { cor: 'var(--tinta-fraca)', texto: 'Entrar para sincronizar' }
+  };
+
+  function atualizarSync(estado, detalhe) {
+    var ponto = $('#syncPonto');
+    var txt = $('#perfilPlanoTxt');
+    var r = ROTULOS_SYNC[estado];
+
+    if (!r) { // nuvem desligada neste site
+      ui.syncTexto = null;
+      ponto.hidden = true;
+      txt.title = '';
+      renderLateral();
+      return;
+    }
+
+    ui.syncTexto = r.texto;
+    ponto.hidden = false;
+    ponto.style.setProperty('--cor-sync', r.cor);
+    ponto.classList.toggle('sync-ponto--girando', !!r.girando);
+    txt.textContent = r.texto;
+    txt.title = detalhe || '';
+
+    if ($('#modalConta').classList.contains('visivel')) renderConta();
+  }
+
+  function recado(texto, tipo) {
+    return '<p class="conta-recado' + (tipo ? ' conta-recado--' + tipo : '') + '">' + esc(texto) + '</p>';
+  }
+
+  function renderConta() {
+    var corpo = $('#contaCorpo');
+
+    if (!Nuvem || !Nuvem.configurada()) {
+      corpo.innerHTML = recado('A sincronização entre aparelhos ainda não foi ligada neste site. ' +
+        'Por enquanto suas notas ficam só neste navegador — use "Exportar backup", em Configurações, ' +
+        'para levá-las para outro lugar.');
+      return;
+    }
+
+    if (!Nuvem.email()) {
+      corpo.innerHTML =
+        recado('Entre com uma conta e suas notas passam a acompanhar você no celular e no computador. ' +
+               'O que já está neste navegador sobe junto na primeira vez, sem perder nada.') +
+        '<div class="conta-forma" style="margin-top:14px">' +
+          '<div><label for="contaEmail">E-mail</label>' +
+          '<input class="entrada" type="email" id="contaEmail" autocomplete="email" placeholder="voce@exemplo.com"></div>' +
+          '<div><label for="contaSenha">Senha</label>' +
+          '<input class="entrada" type="password" id="contaSenha" autocomplete="current-password" ' +
+          'placeholder="pelo menos 6 caracteres"></div>' +
+          '<div id="contaAviso"></div>' +
+          '<div class="conta-acoes">' +
+            '<button class="btn btn--fantasma" id="contaCriar">Criar conta</button>' +
+            '<button class="btn btn--principal" id="contaEntrar">Entrar</button>' +
+          '</div>' +
+        '</div>';
+      ligarFormularioConta();
+      return;
+    }
+
+    var r = ROTULOS_SYNC[Nuvem.estado] || {};
+    corpo.innerHTML =
+      '<div class="conta-linha"><b>Conta</b><span>' + esc(Nuvem.email()) + '</span></div>' +
+      '<div class="conta-linha"><b>Sincronia</b><span style="color:' + (r.cor || 'inherit') + '">' +
+        esc(r.texto || '—') + (Nuvem.detalhe ? ' · ' + esc(Nuvem.detalhe) : '') + '</span></div>' +
+      '<div class="conta-acoes" style="margin-top:14px">' +
+        '<button class="btn btn--fantasma" id="contaSair">Sair</button>' +
+        '<button class="btn btn--principal" id="contaAgora">Sincronizar agora</button>' +
+      '</div>';
+
+    $('#contaAgora').addEventListener('click', function () {
+      Nuvem.enviarJa().then(function () { toast('Sincronizado.'); });
+    });
+    $('#contaSair').addEventListener('click', function () {
+      confirmar('Sair da conta? Suas notas continuam neste navegador, mas param de sincronizar.', 'Sair')
+        .then(function (sim) {
+          if (!sim) return;
+          Nuvem.sair().then(function () { renderConta(); toast('Você saiu da conta.'); });
+        });
+    });
+  }
+
+  function ligarFormularioConta() {
+    var aviso = $('#contaAviso');
+    var botoes = [$('#contaEntrar'), $('#contaCriar')];
+
+    function ocupado(valor) {
+      botoes.forEach(function (b) { b.disabled = valor; b.style.opacity = valor ? .55 : 1; });
+    }
+    function falar(texto, tipo) { aviso.innerHTML = recado(texto, tipo); }
+
+    function dados() {
+      var email = $('#contaEmail').value.trim();
+      var senha = $('#contaSenha').value;
+      if (!email || !senha) { falar('Preencha e-mail e senha.', 'ruim'); return null; }
+      if (senha.length < 6) { falar('A senha precisa de pelo menos 6 caracteres.', 'ruim'); return null; }
+      return { email: email, senha: senha };
+    }
+
+    function traduzir(e) {
+      var m = (e && e.message) || '';
+      if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha não conferem.';
+      if (/already registered|User already/i.test(m)) return 'Já existe conta com esse e-mail. Tente entrar.';
+      if (/Password should be/i.test(m)) return 'A senha precisa de pelo menos 6 caracteres.';
+      if (/Unable to validate email|invalid format/i.test(m)) return 'Esse e-mail não parece válido.';
+      if (/rate limit|too many/i.test(m)) return 'Muitas tentativas seguidas. Espere um minuto.';
+      if (/fetch|network/i.test(m)) return 'Sem conexão com o servidor. Suas notas continuam salvas aqui.';
+      return m || 'Não consegui completar. Tente de novo.';
+    }
+
+    $('#contaEntrar').addEventListener('click', function () {
+      var d = dados();
+      if (!d) return;
+      ocupado(true);
+      falar('Entrando…');
+      Nuvem.entrar(d.email, d.senha)
+        .then(function () { renderConta(); renderTudo(); toast('Conectado. Suas notas estão sincronizando.'); })
+        .catch(function (e) { ocupado(false); falar(traduzir(e), 'ruim'); });
+    });
+
+    $('#contaCriar').addEventListener('click', function () {
+      var d = dados();
+      if (!d) return;
+      ocupado(true);
+      falar('Criando sua conta…');
+      Nuvem.criarConta(d.email, d.senha)
+        .then(function (r) {
+          if (r.confirmar) {
+            ocupado(false);
+            falar('Conta criada. Confirme pelo link que enviamos para ' + d.email + ' e depois entre.', 'bom');
+            return;
+          }
+          renderConta();
+          renderTudo();
+          toast('Conta criada. Suas notas já estão na nuvem.');
+        })
+        .catch(function (e) { ocupado(false); falar(traduzir(e), 'ruim'); });
+    });
+
+    $('#contaSenha').addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); $('#contaEntrar').click(); }
+    });
+  }
+
   /* ========================================================== instalação */
 
   /*
@@ -1463,6 +1623,12 @@
       ligarEventos();
       renderTudo();
       sincronizarConfig();
+
+      if (Nuvem) {
+        Nuvem.aoMudar = atualizarSync;
+        // depois do primeiro render: a tela nunca espera a rede
+        Nuvem.iniciar().catch(function () { atualizarSync('erro'); });
+      }
 
       var params = new URLSearchParams(location.search);
       if (params.get('nova') === '1') criarNota();
