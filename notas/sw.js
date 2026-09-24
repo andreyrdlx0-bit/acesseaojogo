@@ -9,7 +9,7 @@
  * navegador descartar o cache velho e buscar o novo.
  */
 
-var VERSAO = 'prioriza-v3';
+var VERSAO = 'prioriza-v4';
 var FONTES = 'prioriza-fontes-v1';
 
 var CASCA = [
@@ -23,6 +23,7 @@ var CASCA = [
   './assets/js/config.js',
   './assets/js/store.js',
   './assets/js/nuvem.js',
+  './assets/js/markdown.js',
   './assets/js/app.js',
   './assets/img/favicon.svg',
   './assets/img/icon-192.png',

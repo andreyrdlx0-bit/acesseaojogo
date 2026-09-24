@@ -768,17 +768,20 @@
     }).join('') || '<p style="font-size:12.5px;color:var(--tinta-fraca);padding:4px">Nenhuma etiqueta.</p>';
   }
 
-  function baixarBackup() {
-    var conteudo = Store.exportar();
-    var blob = new Blob([conteudo], { type: 'application/json' });
+  function baixarArquivo(conteudo, nome, tipo) {
+    var blob = new Blob([conteudo], { type: tipo });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'prioriza-backup-' + hojeISO() + '.json';
+    a.download = nome;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function baixarBackup() {
+    baixarArquivo(Store.exportar(), 'prioriza-backup-' + hojeISO() + '.json', 'application/json');
     toast('Backup baixado.');
   }
 
@@ -1238,6 +1241,38 @@
     });
 
     $('#cfgExportar').addEventListener('click', baixarBackup);
+
+    /* --- Markdown para o Obsidian --- */
+    var Md = window.Markdown;
+    if (Md) {
+      var nota = $('#cfgCofreNota');
+      if (Md.temCofre()) {
+        $('#cfgCofre').hidden = false;
+        nota.textContent = 'Escolha a pasta do seu cofre. Um arquivo .md por nota; ' +
+          'exportar de novo atualiza os mesmos arquivos em vez de duplicar.';
+      } else {
+        // iPhone e Firefox não têm a API de pastas; o .md único cobre esses casos
+        nota.textContent = 'Seu navegador não deixa um site escrever em pastas. ' +
+          'No Chrome ou no Edge de computador aparece aqui um botão para gravar ' +
+          'direto no cofre; por ora, use o arquivo único.';
+      }
+
+      $('#cfgMarkdown').addEventListener('click', function () {
+        baixarArquivo(Md.arquivoUnico(), 'prioriza-' + hojeISO() + '.md', 'text/markdown');
+        toast('Markdown baixado.');
+      });
+
+      $('#cfgCofre').addEventListener('click', function () {
+        Md.escreverNoCofre()
+          .then(function (r) {
+            toast(plural(r.gravadas, 'nota gravada', 'notas gravadas') + ' em "' + r.pasta + '".');
+          })
+          .catch(function (e) {
+            if (e && e.name === 'AbortError') return; // fechou o seletor de pasta
+            toast('Não consegui gravar no cofre: ' + ((e && e.message) || 'permissão negada'), null, 6000);
+          });
+      });
+    }
     $('#cfgImportar').addEventListener('click', function () { $('#arquivoImport').click(); });
     $('#arquivoImport').addEventListener('change', function () {
       var arquivo = this.files[0];

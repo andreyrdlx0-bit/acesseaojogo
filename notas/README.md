@@ -78,6 +78,47 @@ não existe servidor. Consequências que o app deixa explícitas para o usuário
 - em aba anônima ou com armazenamento bloqueado, a gravação falha e o app avisa
   na tela em vez de fingir que salvou.
 
+## Levar as notas para o Obsidian
+
+As notas saem como Markdown com frontmatter YAML, que o Obsidian lê como
+propriedades — então prioridade, caderno, etiquetas e prazo ficam pesquisáveis
+lá dentro, e o checklist vira caixas de marcar nativas.
+
+```markdown
+---
+prioridade: Urgente
+caderno: Trabalho
+tags:
+  - Reunião
+prazo: 2026-09-24
+concluida: false
+---
+
+# Fechar proposta do cliente novo
+
+Revisar escopo, ajustar valores e enviar até o fim do dia.
+
+## Checklist
+- [x] Revisar escopo
+- [ ] Ajustar valores
+```
+
+Duas saídas, em Configurações:
+
+- **Salvar no meu cofre** — escolhe uma pasta e grava um `.md` por nota, direto
+  no cofre. Usa a File System Access API, que só existe no Chrome e no Edge de
+  computador. Exportar de novo atualiza os mesmos arquivos em vez de duplicar.
+- **Baixar em Markdown** — um arquivo único com tudo. Funciona em qualquer
+  navegador, inclusive iPhone.
+
+Notas na lixeira não são exportadas. Nomes de arquivo são higienizados para os
+três sistemas e para os links do Obsidian (`/ \ : * ? " < > | # ^ [ ]` saem), com
+sufixo numérico quando duas notas têm o mesmo título.
+
+**O que isto não é:** o Obsidian não tem API para um site alcançar seu cofre
+pela internet. Isso é exportação, não sincronização de mão dupla — para as
+notas acompanharem você entre aparelhos, é a camada abaixo que resolve.
+
 ## Sincronização entre aparelhos (SaaS)
 
 Existe uma camada de nuvem opcional. Ela é **local-first**: o navegador continua
