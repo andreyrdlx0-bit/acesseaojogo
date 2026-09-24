@@ -316,6 +316,21 @@
       </div>
 
       <div class="campo">
+        <span class="campo__rot">Levar para o Obsidian</span>
+        <p class="aviso">Suas notas viram arquivos Markdown com prioridade, etiquetas e prazo
+          no frontmatter — o Obsidian lê tudo isso como propriedades pesquisáveis.</p>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn--fantasma btn--pequeno" id="cfgCofre" hidden>
+            <svg><use href="#ic-caderno"/></svg> Salvar no meu cofre
+          </button>
+          <button class="btn btn--fantasma btn--pequeno" id="cfgMarkdown">
+            <svg><use href="#ic-baixar"/></svg> Baixar em Markdown
+          </button>
+        </div>
+        <p id="cfgCofreNota" style="font-size:11.5px;color:var(--tinta-fraca);margin-top:8px"></p>
+      </div>
+
+      <div class="campo">
         <span class="campo__rot">Seus dados</span>
         <p class="aviso" id="avisoDados">
           Seus dados ficam gravados apenas neste navegador (armazenamento local) — nada é enviado
@@ -368,6 +383,7 @@
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/store.js"></script>
 <script src="../assets/js/nuvem.js"></script>
+<script src="../assets/js/markdown.js"></script>
 <script src="../assets/js/app.js"></script>
 <script>
   // escopo /notas/ — cobre esta página e a de apresentação
