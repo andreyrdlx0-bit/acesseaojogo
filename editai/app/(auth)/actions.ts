@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { publicEnv } from "@/config/env";
+import { getAppUrl } from "@/lib/app-url";
 import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -43,7 +43,7 @@ export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.name },
-      emailRedirectTo: `${publicEnv.appUrl}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${await getAppUrl()}/auth/callback?next=/dashboard`,
     },
   });
   if (error) {
@@ -59,7 +59,7 @@ export async function requestPasswordReset(_: AuthState, form: FormData): Promis
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   const supabase = await createSupabaseServerClient();
   await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: `${publicEnv.appUrl}/auth/callback?next=/reset-password`,
+    redirectTo: `${await getAppUrl()}/auth/callback?next=/reset-password`,
   });
   // Mesma resposta exista ou não a conta (não revela e-mails cadastrados).
   return { success: "Se houver uma conta com esse e-mail, enviamos um link para redefinir a senha." };

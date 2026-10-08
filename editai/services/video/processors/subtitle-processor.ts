@@ -5,7 +5,7 @@ import { findOperation } from "@/lib/editing-plan/validate";
 import type { TranscriptWord } from "@/types/video";
 import { normalizeText } from "@/utils/text";
 import { SUBTITLE_FONT_FAMILY } from "../fonts";
-import { escapeFilterValue } from "../ffmpeg";
+import { assColor, assFilter, assHeader, dialogue, escapeAssText } from "./ass";
 import type { OperationProcessor } from "./types";
 
 type SubtitleOp = OperationOf<"subtitles">;
@@ -40,7 +40,7 @@ export const SubtitleProcessor: OperationProcessor = {
     const file = path.join(ctx.workDir, "subtitles.ass");
     await writeFile(file, ass, "utf8");
     ctx.files.set("subtitles", file);
-    ctx.graph.video.push(`ass=filename='${escapeFilterValue(file)}'`);
+    ctx.graph.video.push(assFilter(file));
   },
 };
 
@@ -55,21 +55,9 @@ export function buildAss(words: TranscriptWord[], op: SubtitleOp, width: number,
   const primary = assColor(op.color);
   const back = op.style === "clean" ? "&H80000000" : "&H64000000";
 
-  const header = [
-    "[Script Info]",
-    "ScriptType: v4.00+",
-    `PlayResX: ${width}`,
-    `PlayResY: ${height}`,
-    "WrapStyle: 0",
-    "ScaledBorderAndShadow: yes",
-    "",
-    "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+  const header = assHeader(width, height, [
     `Style: Default,${SUBTITLE_FONT_FAMILY},${fontSize},${primary},&H000000FF,&H00000000,${back},${bold},0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},${alignment},${Math.round(width * 0.08)},${Math.round(width * 0.08)},${marginV},1`,
-    "",
-    "[Events]",
-    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-  ];
+  ]);
 
   const events: string[] = [];
   const chunks = chunkWords(words, op.maxWordsPerLine);
@@ -115,29 +103,4 @@ function styleWord(word: string, op: SubtitleOp, highlight: boolean): string {
 function isKeyword(word: string): boolean {
   const n = normalizeText(word);
   return (n.length >= 6 && !STOPWORDS.has(n)) || /\d/.test(n);
-}
-
-function dialogue(start: number, end: number, text: string) {
-  return `Dialogue: 0,${assTime(start)},${assTime(end)},Default,,0,0,0,,${text}`;
-}
-
-/** #RRGGBB -> &H00BBGGRR */
-function assColor(hex: string): string {
-  const r = hex.slice(1, 3);
-  const g = hex.slice(3, 5);
-  const b = hex.slice(5, 7);
-  return `&H00${b}${g}${r}`.toUpperCase();
-}
-
-function assTime(t: number): string {
-  const cs = Math.max(0, Math.round(t * 100));
-  const h = Math.floor(cs / 360000);
-  const m = Math.floor((cs % 360000) / 6000);
-  const s = Math.floor((cs % 6000) / 100);
-  const c = cs % 100;
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(c).padStart(2, "0")}`;
-}
-
-function escapeAssText(text: string): string {
-  return text.replace(/\\/g, "").replace(/[{}]/g, "").replace(/\n/g, " ");
 }

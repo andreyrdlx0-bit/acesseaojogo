@@ -1,8 +1,9 @@
 "use client";
 
 import { Pencil } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/api/client";
+import { kickJobs } from "@/api/job-runner";
 import { ErrorState } from "@/components/app/states";
 import { ProjectStatusBadge } from "@/components/project/status-badge";
 import { usePolling } from "@/hooks/use-polling";
@@ -63,7 +64,26 @@ export function EditorWorkspace({
     }
   }, [project.id]);
 
-  usePolling(refresh, 2000, Boolean(activeRender) || analyzing);
+  const hasPendingWork = Boolean(activeRender) || analyzing;
+  const lastKick = useRef(0);
+  const kick = useCallback(() => {
+    lastKick.current = Date.now();
+    void kickJobs();
+  }, []);
+
+  // Sem worker dedicado (Vercel), o processamento é disparado pelo navegador.
+  useEffect(() => {
+    if (hasPendingWork) kick();
+  }, [hasPendingWork, activeRender?.id, kick]);
+
+  usePolling(
+    async () => {
+      await refresh();
+      if (Date.now() - lastKick.current > 15_000) kick();
+    },
+    2000,
+    hasPendingWork,
+  );
 
   const selected = versions.find((v) => v.id === selectedVersionId) ?? versions.find((v) => v.id === project.current_version_id) ?? null;
   const hasEdits = versions.some((v) => v.version_number > 1 && v.status === "ready");

@@ -6,7 +6,8 @@ import { z } from "zod";
  * Nunca importe este arquivo em Client Components.
  */
 const serverSchema = z.object({
-  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  // Opcional: sem ela, a URL é deduzida da requisição (ver lib/app-url.ts).
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -23,12 +24,14 @@ const serverSchema = z.object({
 
   FFMPEG_PATH: z.string().default("ffmpeg"),
   FFPROBE_PATH: z.string().default("ffprobe"),
-  FONT_PATH: z.string().optional(),
+  FONTS_DIR: z.string().optional(),
+  INLINE_JOBS: z.enum(["true", "false"]).default("true"),
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(250).default(2000),
   WORKER_TMP_DIR: z.string().default(".worker-tmp"),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(1),
 
-  MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(5000).default(500),
+  // Plano grátis do Supabase limita arquivos a 50 MB.
+  MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(5000).default(50),
   MAX_VIDEO_SECONDS: z.coerce.number().int().min(10).default(900),
 
   PAYMENT_PROVIDER: z.enum(["stripe", "none"]).default("none"),
@@ -61,3 +64,9 @@ export const publicEnv = {
 };
 
 export const isSupabaseConfigured = () => Boolean(publicEnv.supabaseUrl && publicEnv.supabaseAnonKey);
+
+/** Variáveis obrigatórias que estão faltando (só os NOMES — nunca valores). */
+export function missingRequiredEnv(): string[] {
+  const required = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
+  return required.filter((key) => !process.env[key]);
+}

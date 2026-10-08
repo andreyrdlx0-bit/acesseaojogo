@@ -137,7 +137,10 @@ export interface QueuedJob<P = Record<string, unknown>> {
 
 export interface RenderQueue {
   enqueue(type: JobType, userId: string, payload: Record<string, unknown>, options?: { priority?: number }): Promise<string>;
-  claim(workerId: string, types: JobType[]): Promise<QueuedJob | null>;
+  /** Com `userId`, só pega jobs daquele usuário (processamento inline na Vercel). */
+  claim(workerId: string, types: JobType[], options?: { userId?: string; staleMinutes?: number }): Promise<QueuedJob | null>;
+  /** Quantos jobs o usuário ainda tem na fila (para o cliente decidir se dispara de novo). */
+  countQueued(userId: string): Promise<number>;
   complete(jobId: string): Promise<void>;
   fail(jobId: string, error: string, retry: boolean): Promise<void>;
 }

@@ -1,9 +1,10 @@
 import type { ProcessProgress, VideoAnalyzer } from "@/types/services";
 import type { TimeRange, VideoMetadata } from "@/types/video";
-import { runFfmpeg, runFfprobe } from "./ffmpeg";
+import { stat } from "node:fs/promises";
+import { FfmpegError, readFfmpegHeader, runFfmpeg, runFfprobe } from "./ffmpeg";
 import { complement, normalizeRanges, round3 } from "./ranges";
 
-interface ProbeStream {
+export interface ProbeStream {
   codec_type: string;
   codec_name?: string;
   width?: number;
@@ -13,7 +14,7 @@ interface ProbeStream {
   tags?: Record<string, string>;
   side_data_list?: { rotation?: number }[];
 }
-interface ProbeResult {
+export interface ProbeResult {
   streams: ProbeStream[];
   format: { duration?: string; size?: string; bit_rate?: string };
 }
@@ -70,8 +71,59 @@ export class FfmpegVideoAnalyzer implements VideoAnalyzer {
 }
 
 export async function probeFile(localPath: string): Promise<ProbeResult> {
-  const out = await runFfprobe(["-print_format", "json", "-show_format", "-show_streams", localPath]);
-  return JSON.parse(out) as ProbeResult;
+  try {
+    const out = await runFfprobe(["-print_format", "json", "-show_format", "-show_streams", localPath]);
+    return JSON.parse(out) as ProbeResult;
+  } catch (error) {
+    // Ambientes sem ffprobe (ex.: Vercel com ffmpeg-static): lê o cabeçalho pelo ffmpeg.
+    if (error instanceof FfmpegError && error.notFound) return probeWithFfmpeg(localPath);
+    throw error;
+  }
+}
+
+/** Interpreta a saída de `ffmpeg -i` no mesmo formato do ffprobe (campos usados aqui). */
+export async function probeWithFfmpeg(localPath: string): Promise<ProbeResult> {
+  return parseFfmpegHeader(await readFfmpegHeader(localPath), (await stat(localPath)).size);
+}
+
+export function parseFfmpegHeader(header: string, sizeBytes: number | null): ProbeResult {
+  const streams: ProbeStream[] = [];
+  const dur = header.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const bitrate = header.match(/Duration:.*?bitrate:\s*(\d+)\s*kb\/s/);
+  const lines = header.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const video = line.match(/Stream #\d+:\d+.*?: Video: (\w+)/);
+    if (video && !/attached pic/.test(line)) {
+      const size = line.match(/,\s*(\d{2,5})x(\d{2,5})[\s,\[]/);
+      const fps = line.match(/,\s*([\d.]+)\s*fps/) ?? line.match(/,\s*([\d.]+)\s*tbr/);
+      // Rotação aparece nas linhas seguintes (side data: displaymatrix).
+      let rotation: number | undefined;
+      for (let j = i + 1; j < Math.min(lines.length, i + 8) && !/Stream #/.test(lines[j]!); j++) {
+        const rot = lines[j]!.match(/rotation of (-?[\d.]+) degrees/);
+        if (rot) rotation = Number(rot[1]);
+      }
+      streams.push({
+        codec_type: "video",
+        codec_name: video[1],
+        width: size ? Number(size[1]) : undefined,
+        height: size ? Number(size[2]) : undefined,
+        avg_frame_rate: fps ? `${Number(fps[1]) * 1000}/1000` : undefined,
+        side_data_list: rotation !== undefined ? [{ rotation }] : undefined,
+      });
+      continue;
+    }
+    const audio = line.match(/Stream #\d+:\d+.*?: Audio: (\w+)/);
+    if (audio) streams.push({ codec_type: "audio", codec_name: audio[1] });
+  }
+  return {
+    streams,
+    format: {
+      duration: dur ? String(Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3])) : undefined,
+      size: sizeBytes != null ? String(sizeBytes) : undefined,
+      bit_rate: bitrate ? String(Number(bitrate[1]) * 1000) : undefined,
+    },
+  };
 }
 
 export async function detectSilences(

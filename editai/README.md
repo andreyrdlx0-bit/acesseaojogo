@@ -119,8 +119,9 @@ Veja `.env.example`. Principais:
 | `SUPABASE_STORAGE_BUCKET` | Bucket privado (padrão `editai-media`) |
 | `AI_PROVIDER` / `AI_API_KEY` / `AI_MODEL` | `anthropic` (padrão `claude-opus-5-5`), `openai` ou `rules` |
 | `STT_PROVIDER` / `SPEECH_TO_TEXT_API_KEY` | `openai` (Whisper) ou `browser` |
-| `FFMPEG_PATH`, `FFPROBE_PATH`, `FONT_PATH` | Binários e fonte dos textos sobrepostos |
-| `MAX_UPLOAD_MB`, `MAX_VIDEO_SECONDS` | Limites de upload |
+| `INLINE_JOBS` | `true` (padrão): o próprio app processa os vídeos (ideal na Vercel). `false`: use o worker dedicado |
+| `FFMPEG_PATH`, `FFPROBE_PATH`, `FONTS_DIR` | Opcionais. Sem eles, usa o `ffmpeg-static` empacotado e a fonte Inter de `assets/fonts` |
+| `MAX_UPLOAD_MB`, `MAX_VIDEO_SECONDS` | Limites de upload (o plano grátis do Supabase aceita até 50 MB por arquivo) |
 | `PAYMENT_PROVIDER`, `PAYMENT_API_KEY`, `PAYMENT_WEBHOOK_SECRET` | Gateway de pagamento (preparado) |
 
 ## Supabase: banco, auth e storage
@@ -196,6 +197,17 @@ npm run worker     # em outro terminal (precisa de FFmpeg)
 
 ## Produção
 
+### Vercel (mais simples: tudo em um lugar)
+
+O app roda inteiro na Vercel, sem servidor extra: quando há uma análise ou renderização pendente, o navegador do usuário chama `POST /api/jobs/run`, que processa **os jobs daquele usuário** com o `ffmpeg-static` empacotado (máx. 300s por chamada no plano Hobby). A fila no banco garante que cada job roda uma única vez.
+
+1. Importe o projeto na Vercel com **Root Directory = `editai`** (Framework: Next.js).
+2. Variáveis obrigatórias: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. As demais têm padrão.
+3. No Supabase, em **Authentication → URL Configuration**: defina a *Site URL* com o domínio da Vercel e adicione `https://editai*.vercel.app/**` em *Redirect URLs*.
+4. O serviço de e-mail padrão do Supabase só envia para membros da organização: para usuários reais, configure um SMTP próprio (Authentication → SMTP) ou desative a confirmação de e-mail.
+
+### Worker dedicado (vídeos longos e volume alto)
+
 - **Web**: Vercel ou qualquer host Node. Configure as variáveis de ambiente públicas e de servidor.
 - **Worker**: processo de longa duração com FFmpeg (Docker, Fly.io, Railway, ECS...). Exemplo de imagem:
   ```dockerfile
@@ -204,7 +216,7 @@ npm run worker     # em outro terminal (precisa de FFmpeg)
   WORKDIR /app
   COPY . .
   RUN npm ci
-  ENV FONT_PATH=/usr/share/fonts/opentype/inter/Inter-Bold.otf
+  ENV FFMPEG_PATH=/usr/bin/ffmpeg FFPROBE_PATH=/usr/bin/ffprobe INLINE_JOBS=false
   CMD ["npm", "run", "worker"]
   ```
 - O rate limiting é em memória (`lib/rate-limit.ts`). Com várias instâncias web, troque por Redis/Upstash.
@@ -236,7 +248,8 @@ npm run engine:demo  # renderização real com FFmpeg
 | As legendas não aparecem e há um aviso | Sem `SPEECH_TO_TEXT_API_KEY`, o vídeo não foi transcrito |
 | "Não conseguimos transcrever o áudio" | Sem STT no servidor e o navegador não suporta Web Speech API: escreva o comando |
 | Respostas da IA genéricas e `provider` = `rules` | Sem `AI_API_KEY`; o planejador por regras está ativo |
-| Erro de fonte em textos sobrepostos | Defina `FONT_PATH` para um `.ttf`/`.otf` existente |
+| Legendas sem a fonte certa | Confira se `assets/fonts` foi publicado junto (ou defina `FONTS_DIR`) |
+| Vídeo longo para de processar na Vercel | Funções têm limite de 300s no plano Hobby: use vídeos curtos ou um worker dedicado (`INLINE_JOBS=false`) |
 | Upload falha com 403 | Bucket ou policies não criados: reaplique a migration |
 
 ## O que é real e o que está preparado

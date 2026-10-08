@@ -4,6 +4,7 @@ import { Download, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/api/client";
+import { kickJobs } from "@/api/job-runner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { estimateRenderCredits } from "@/config/credits";
@@ -50,6 +51,7 @@ export function ExportModal({
       if (!render) return;
       const { render: r } = await api.get<{ render: RenderWithUrl }>(`/api/renders/${render.id}`);
       setRender(r);
+      if (r.status === "queued") void kickJobs();
     },
     1500,
     Boolean(running),
@@ -62,6 +64,7 @@ export function ExportModal({
     try {
       const { render: r } = await api.post<{ render: Render }>(`/api/projects/${projectId}/exports`, { versionId: version.id, aspectRatio: ratio, quality });
       setRender(r);
+      void kickJobs();
     } catch (e) {
       const err = e instanceof ApiError ? e : null;
       setError({ message: err?.message ?? "Não foi possível exportar.", credits: err?.code === "INSUFFICIENT_CREDITS" });

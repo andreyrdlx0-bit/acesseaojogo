@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import ffmpegStatic from "ffmpeg-static";
 
 /**
  * Execução segura de FFmpeg/FFprobe: SEMPRE via array de argumentos (sem shell),
@@ -9,9 +11,16 @@ export interface FfmpegBinaries {
   ffprobe: string;
 }
 
+/**
+ * Resolução dos binários:
+ *  1. FFMPEG_PATH / FFPROBE_PATH (ex.: FFmpeg do sistema no Docker do worker);
+ *  2. ffmpeg-static (binário empacotado — usado na Vercel, sem ffprobe);
+ *  3. "ffmpeg" / "ffprobe" do PATH.
+ */
 export function binaries(): FfmpegBinaries {
+  const bundled = typeof ffmpegStatic === "string" && existsSync(ffmpegStatic) ? ffmpegStatic : null;
   return {
-    ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
+    ffmpeg: process.env.FFMPEG_PATH || bundled || "ffmpeg",
     ffprobe: process.env.FFPROBE_PATH || "ffprobe",
   };
 }
@@ -21,6 +30,8 @@ export class FfmpegError extends Error {
     message: string,
     readonly exitCode: number | null,
     readonly stderrTail: string,
+    /** O binário não existe neste ambiente (ENOENT). */
+    readonly notFound = false,
   ) {
     super(message);
     this.name = "FfmpegError";
@@ -37,32 +48,44 @@ export interface RunOptions {
 
 export function runFfmpeg(args: string[], options: RunOptions = {}): Promise<{ stderr: string }> {
   const fullArgs = ["-hide_banner", "-nostdin", "-y", ...(options.onProgress ? ["-progress", "pipe:1", "-nostats"] : []), ...args];
-  return runProcess(binaries().ffmpeg, fullArgs, options);
+  return runProcess(binaries().ffmpeg, fullArgs, options).then(({ stderr }) => ({ stderr }));
 }
 
 export async function runFfprobe(args: string[]): Promise<string> {
-  const { stdout } = await runProcessWithStdout(binaries().ffprobe, ["-v", "error", ...args], { timeoutMs: 60_000 });
+  const { stdout } = await runProcess(binaries().ffprobe, ["-v", "error", ...args], { timeoutMs: 60_000 });
   return stdout;
 }
 
-function runProcess(bin: string, args: string[], options: RunOptions): Promise<{ stderr: string }> {
-  return runProcessWithStdout(bin, args, options).then(({ stderr }) => ({ stderr }));
+/** Roda o ffmpeg sem saída (só para ler o cabeçalho do arquivo no stderr). */
+export async function readFfmpegHeader(file: string): Promise<string> {
+  try {
+    const { stderr } = await runProcess(binaries().ffmpeg, ["-hide_banner", "-nostdin", "-i", file], { timeoutMs: 60_000 });
+    return stderr;
+  } catch (error) {
+    // Sem arquivo de saída o ffmpeg sai com código 1 — o cabeçalho está no stderr.
+    if (error instanceof FfmpegError && !error.notFound) return error.stderrTail;
+    throw error;
+  }
 }
 
-function runProcessWithStdout(
-  bin: string,
-  args: string[],
-  options: RunOptions,
-): Promise<{ stdout: string; stderr: string }> {
+function runProcess(bin: string, args: string[], options: RunOptions): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let progressBuffer = "";
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abort);
+      fn();
+    };
     const timeout = options.timeoutMs
       ? setTimeout(() => {
           child.kill("SIGKILL");
-          reject(new FfmpegError("Tempo limite de processamento excedido", null, stderr.slice(-2000)));
+          finish(() => reject(new FfmpegError("Tempo limite de processamento excedido", null, stderr.slice(-2000))));
         }, options.timeoutMs)
       : null;
     const abort = () => child.kill("SIGKILL");
@@ -89,15 +112,13 @@ function runProcessWithStdout(
       stderr += chunk.toString();
       if (stderr.length > 200_000) stderr = stderr.slice(-100_000);
     });
-    child.on("error", (err) => {
-      if (timeout) clearTimeout(timeout);
-      reject(new FfmpegError(`Não foi possível executar ${bin}: ${err.message}`, null, ""));
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      finish(() => reject(new FfmpegError(`Não foi possível executar ${bin}: ${err.message}`, null, "", err.code === "ENOENT")));
     });
     child.on("close", (code) => {
-      if (timeout) clearTimeout(timeout);
-      options.signal?.removeEventListener("abort", abort);
-      if (code === 0) resolve({ stdout, stderr });
-      else reject(new FfmpegError(`${bin} terminou com código ${code}`, code, stderr.slice(-4000)));
+      finish(() =>
+        code === 0 ? resolve({ stdout, stderr }) : reject(new FfmpegError(`${bin} terminou com código ${code}`, code, stderr.slice(-8000))),
+      );
     });
   });
 }

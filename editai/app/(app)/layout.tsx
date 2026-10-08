@@ -1,14 +1,15 @@
 import { Header } from "@/components/app/header";
 import { MobileNav, Sidebar } from "@/components/app/sidebar";
 import { SetupNotice } from "@/components/app/setup-notice";
-import { isSupabaseConfigured } from "@/config/env";
+import { missingRequiredEnv } from "@/config/env";
 import { requireUserOrRedirect } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) return <SetupNotice />;
+  const missing = missingRequiredEnv();
+  if (missing.length) return <SetupNotice missing={missing} />;
   const user = await requireUserOrRedirect();
   const supabase = await createSupabaseServerClient();
   const [{ data: credits }, { data: profile }] = await Promise.all([

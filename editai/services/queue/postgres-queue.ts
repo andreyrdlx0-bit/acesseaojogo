@@ -20,8 +20,15 @@ export class PostgresRenderQueue implements RenderQueue {
     return data.id as string;
   }
 
-  async claim(workerId: string, types: JobType[]): Promise<QueuedJob | null> {
-    const { data, error } = await this.db.rpc("claim_next_job", { p_worker: workerId, p_types: types });
+  async claim(workerId: string, types: JobType[], options: { userId?: string; staleMinutes?: number } = {}): Promise<QueuedJob | null> {
+    const { data, error } = options.userId
+      ? await this.db.rpc("claim_next_job_for_user", {
+          p_worker: workerId,
+          p_types: types,
+          p_user_id: options.userId,
+          p_stale_minutes: options.staleMinutes ?? 10,
+        })
+      : await this.db.rpc("claim_next_job", { p_worker: workerId, p_types: types });
     if (error) throw new Error(`Falha ao buscar job: ${error.message}`);
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) return null;
@@ -33,6 +40,16 @@ export class PostgresRenderQueue implements RenderQueue {
       attempts: row.attempts,
       maxAttempts: row.max_attempts,
     };
+  }
+
+  async countQueued(userId: string): Promise<number> {
+    const { count, error } = await this.db
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "queued");
+    if (error) throw new Error(`Falha ao contar jobs: ${error.message}`);
+    return count ?? 0;
   }
 
   async complete(jobId: string) {

@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // FFmpeg roda apenas no worker; o app web nunca importa child_process.
-  serverExternalPackages: [],
+  // O binário do FFmpeg (ffmpeg-static) não é empacotado pelo webpack: é copiado
+  // como arquivo para a função que processa vídeos (/api/jobs/run), junto com
+  // a fonte usada nas legendas.
+  serverExternalPackages: ["ffmpeg-static"],
+  outputFileTracingIncludes: {
+    "/api/jobs/run": ["./node_modules/ffmpeg-static/ffmpeg", "./assets/fonts/**/*"],
+  },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
   },

@@ -7,6 +7,7 @@ import { getStorage } from "@/services/storage";
 import type { Project } from "@/types/domain";
 import type { VideoAnalyzer } from "@/types/services";
 import { storagePaths } from "@/utils/storage-paths";
+import { defaultTmpRoot } from "./fonts";
 import { extractSpeechAudio, extractThumbnail, FfmpegVideoAnalyzer } from "./analyzer";
 
 const STT_MAX_BYTES = 24 * 1024 * 1024;
@@ -18,7 +19,7 @@ const STT_MAX_BYTES = 24 * 1024 * 1024;
 export class VideoAnalysisService {
   constructor(
     private readonly analyzer: VideoAnalyzer = new FfmpegVideoAnalyzer(),
-    private readonly tmpRoot = process.env.WORKER_TMP_DIR || ".worker-tmp",
+    private readonly tmpRoot = defaultTmpRoot(),
   ) {}
 
   async run(projectId: string): Promise<void> {

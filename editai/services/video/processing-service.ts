@@ -9,6 +9,7 @@ import { getStorage } from "@/services/storage";
 import type { MediaAsset, Project, ProjectVersion, Render, VideoMetadataRow } from "@/types/domain";
 import type { VideoProcessor } from "@/types/services";
 import { storagePaths } from "@/utils/storage-paths";
+import { defaultTmpRoot } from "./fonts";
 import { FfmpegVideoProcessor } from "./engine";
 
 /**
@@ -20,7 +21,7 @@ import { FfmpegVideoProcessor } from "./engine";
 export class VideoProcessingService {
   constructor(
     private readonly processor: VideoProcessor = new FfmpegVideoProcessor(),
-    private readonly tmpRoot = process.env.WORKER_TMP_DIR || ".worker-tmp",
+    private readonly tmpRoot = defaultTmpRoot(),
   ) {}
 
   async runRender(renderId: string): Promise<void> {
