@@ -1,6 +1,7 @@
 # Banco de dados
 
 - `migrations/0001_init.sql` — tabelas, RLS, funções de créditos, fila de jobs e bucket de storage.
+- `migrations/0002_security_hardening.sql` — ajustes do Security Advisor (search_path, revoke).
 
 Aplicação:
 
