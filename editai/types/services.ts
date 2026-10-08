@@ -86,6 +86,8 @@ export interface VideoProcessInput {
   /** Arquivos locais auxiliares já baixados (ex.: música). */
   assets: { musicPath?: string };
   workDir: string;
+  /** Limites do ambiente (ex.: Vercel: tempo da função e tamanho máx. do upload). */
+  limits?: { timeoutMs?: number; maxOutputBytes?: number };
 }
 
 export interface VideoProcessResult {
@@ -141,8 +143,11 @@ export interface RenderQueue {
   claim(workerId: string, types: JobType[], options?: { userId?: string; staleMinutes?: number }): Promise<QueuedJob | null>;
   /** Quantos jobs o usuário ainda tem na fila (para o cliente decidir se dispara de novo). */
   countQueued(userId: string): Promise<number>;
-  complete(jobId: string): Promise<void>;
-  fail(jobId: string, error: string, retry: boolean): Promise<void>;
+  /** Só conclui se o job ainda pertence a `workerId` (cerca contra execuções duplicadas). */
+  complete(jobId: string, workerId: string): Promise<boolean>;
+  fail(jobId: string, workerId: string, error: string, retry: boolean): Promise<boolean>;
+  /** Renova o lock de um job em execução (sinal de vida). */
+  heartbeat(jobId: string, workerId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------- Payments

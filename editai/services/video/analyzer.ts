@@ -1,6 +1,7 @@
 import type { ProcessProgress, VideoAnalyzer } from "@/types/services";
 import type { TimeRange, VideoMetadata } from "@/types/video";
 import { stat } from "node:fs/promises";
+import { PermanentJobError } from "@/services/jobs/errors";
 import { FfmpegError, readFfmpegHeader, runFfmpeg, runFfprobe } from "./ffmpeg";
 import { complement, normalizeRanges, round3 } from "./ranges";
 
@@ -27,16 +28,25 @@ export class FfmpegVideoAnalyzer implements VideoAnalyzer {
     onProgress?.({ percent: 10, stage: "probe", message: "Lendo informações do vídeo..." });
     const probe = await probeFile(localPath);
     const video = probe.streams.find((s) => s.codec_type === "video");
-    if (!video?.width || !video.height) throw new Error("Arquivo sem stream de vídeo válido");
+    if (!video?.width || !video.height) {
+      throw new PermanentJobError("Arquivo sem stream de vídeo válido", "Esse arquivo não tem um vídeo válido. Envie um MP4, MOV ou WEBM.");
+    }
     const audio = probe.streams.find((s) => s.codec_type === "audio");
-    const duration = Number(probe.format.duration ?? 0);
-    if (!Number.isFinite(duration) || duration <= 0) throw new Error("Duração do vídeo inválida");
+    let duration = Number(probe.format.duration ?? NaN);
+    // WebM de MediaRecorder/gravadores web não traz duração no cabeçalho: mede.
+    if (!Number.isFinite(duration) || duration <= 0) duration = await measureDuration(localPath);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      throw new PermanentJobError("Duração do vídeo inválida", "Não conseguimos ler esse vídeo. Verifique o formato ou tente novamente.");
+    }
 
     const rotation = Math.abs(
       Number(video.side_data_list?.find((d) => d.rotation !== undefined)?.rotation ?? video.tags?.rotate ?? 0),
     );
     const swap = rotation === 90 || rotation === 270;
-    const fps = parseFps(video.avg_frame_rate) ?? parseFps(video.r_frame_rate) ?? 30;
+    // VFR (ex.: gravação de tela): a média engana; usa a maior entre média e taxa real (até 60).
+    const avgFps = parseFps(video.avg_frame_rate);
+    const realFps = parseFps(video.r_frame_rate);
+    const fps = Math.max(avgFps ?? 0, Math.min(60, realFps ?? 0)) || 30;
 
     let silences: TimeRange[] = [];
     let meanVolumeDb: number | null = null;
@@ -88,18 +98,20 @@ export async function probeWithFfmpeg(localPath: string): Promise<ProbeResult> {
 
 export function parseFfmpegHeader(header: string, sizeBytes: number | null): ProbeResult {
   const streams: ProbeStream[] = [];
-  const dur = header.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
-  const bitrate = header.match(/Duration:.*?bitrate:\s*(\d+)\s*kb\/s/);
+  // Só a linha de nível superior (2 espaços): metadados do arquivo não podem forjar a duração.
+  const dur = header.match(/^ {2}Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/m);
+  const bitrate = header.match(/^ {2}Duration:.*?bitrate:\s*(\d+)\s*kb\/s/m);
   const lines = header.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const video = line.match(/Stream #\d+:\d+.*?: Video: (\w+)/);
     if (video && !/attached pic/.test(line)) {
       const size = line.match(/,\s*(\d{2,5})x(\d{2,5})[\s,\[]/);
-      const fps = line.match(/,\s*([\d.]+)\s*fps/) ?? line.match(/,\s*([\d.]+)\s*tbr/);
+      const avgM = line.match(/,\s*([\d.]+)\s*fps/);
+      const tbrM = line.match(/,\s*([\d.]+)\s*tbr/);
       // Rotação aparece nas linhas seguintes (side data: displaymatrix).
       let rotation: number | undefined;
-      for (let j = i + 1; j < Math.min(lines.length, i + 8) && !/Stream #/.test(lines[j]!); j++) {
+      for (let j = i + 1; j < lines.length && !/Stream #|Input #/.test(lines[j]!); j++) {
         const rot = lines[j]!.match(/rotation of (-?[\d.]+) degrees/);
         if (rot) rotation = Number(rot[1]);
       }
@@ -108,7 +120,8 @@ export function parseFfmpegHeader(header: string, sizeBytes: number | null): Pro
         codec_name: video[1],
         width: size ? Number(size[1]) : undefined,
         height: size ? Number(size[2]) : undefined,
-        avg_frame_rate: fps ? `${Number(fps[1]) * 1000}/1000` : undefined,
+        avg_frame_rate: (avgM ?? tbrM) ? `${Math.round(Number((avgM ?? tbrM)![1]) * 1000)}/1000` : undefined,
+        r_frame_rate: tbrM ? `${Math.round(Number(tbrM[1]) * 1000)}/1000` : undefined,
         side_data_list: rotation !== undefined ? [{ rotation }] : undefined,
       });
       continue;
@@ -165,8 +178,9 @@ export async function extractThumbnail(localPath: string, outPath: string, durat
 }
 
 /** Áudio mono 16 kHz em MP3 — formato compacto ideal para Speech-to-Text. */
-export async function extractSpeechAudio(localPath: string, outPath: string): Promise<void> {
-  await runFfmpeg(["-i", localPath, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", outPath], {
+export async function extractSpeechAudio(localPath: string, outPath: string, maxSeconds?: number): Promise<void> {
+  const limit = maxSeconds ? ["-t", String(Math.ceil(maxSeconds))] : [];
+  await runFfmpeg(["-i", localPath, ...limit, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", outPath], {
     timeoutMs: 10 * 60_000,
   });
 }
@@ -177,4 +191,12 @@ function parseFps(value?: string): number | null {
   if (!n || !d) return null;
   const fps = n / d;
   return Number.isFinite(fps) && fps > 0 && fps <= 240 ? fps : null;
+}
+
+/** Duração real lida remuxando sem decodificar (para arquivos sem Duration no cabeçalho). */
+export async function measureDuration(localPath: string): Promise<number> {
+  const { stderr } = await runFfmpeg(["-i", localPath, "-map", "0", "-c", "copy", "-f", "null", "-"], { timeoutMs: 5 * 60_000 });
+  const all = [...stderr.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)];
+  const last = all.at(-1);
+  return last ? Number(last[1]) * 3600 + Number(last[2]) * 60 + Number(last[3]) : NaN;
 }

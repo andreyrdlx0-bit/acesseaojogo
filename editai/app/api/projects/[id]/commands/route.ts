@@ -10,7 +10,11 @@ const schema = z
     audioPath: z.string().max(500).optional(),
     audioMimeType: z.string().max(100).optional(),
     audioDuration: z.number().min(0).max(MAX_AUDIO_COMMAND_SECONDS).optional(),
-    browserTranscript: z.string().max(MAX_INSTRUCTION_CHARS).optional(),
+    browserTranscript: z
+      .string()
+      .max(20_000)
+      .transform((t) => t.slice(0, MAX_INSTRUCTION_CHARS))
+      .optional(),
     mode: z.enum(["edit", "autopilot"]).default("edit"),
     baseVersionId: z.string().uuid().optional(),
   })

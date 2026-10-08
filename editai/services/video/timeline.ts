@@ -2,6 +2,7 @@ import type { EditingPlan } from "@/lib/editing-plan";
 import { findOperation, findOperations } from "@/lib/editing-plan/validate";
 import type { TimeRange, TranscriptWord, VideoMetadata } from "@/types/video";
 import { normalizeText } from "@/utils/text";
+import { normalizeFps } from "./fps";
 import { dropTiny, intersect, normalizeRanges, round3, subtract, totalDuration } from "./ranges";
 
 /**
@@ -89,6 +90,13 @@ export function buildTimeline(metadata: VideoMetadata, plan: EditingPlan, silenc
     segments = [{ start: 0, end: duration }];
   }
 
+  // Encaixa os limites na grade de quadros: é exatamente o que o render mantém,
+  // então duração final, legendas e zoom ficam alinhados à imagem.
+  const fps = normalizeFps(metadata.fps);
+  const snapped = segments
+    .map((s) => ({ start: Math.round(s.start * fps) / fps, end: Math.min(duration, Math.round(s.end * fps) / fps) }))
+    .filter((s) => s.end > s.start);
+  if (snapped.length) segments = snapped;
   segments = segments.map((s) => ({ start: round3(s.start), end: round3(s.end) }));
   const kept = totalDuration(segments);
   return {

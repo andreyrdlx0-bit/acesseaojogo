@@ -8,6 +8,7 @@ export const AUDIO_MIME_TYPES = {
   "audio/webm": "webm",
   "audio/ogg": "ogg",
   "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
   "audio/mpeg": "mp3",
   "audio/wav": "wav",
   "audio/x-wav": "wav",
@@ -19,6 +20,8 @@ export const MUSIC_MIME_TYPES = {
   "audio/x-wav": "wav",
   "audio/ogg": "ogg",
   "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/m4a": "m4a",
 } as const;
 
 export const MAX_AUDIO_COMMAND_MB = 20;

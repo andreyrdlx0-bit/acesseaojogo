@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAppUrl } from "@/lib/app-url";
+import { safeNextPath } from "@/lib/safe-redirect";
 import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,12 +15,6 @@ export interface AuthState {
 const email = z.string().trim().email("Informe um e-mail válido.");
 const password = z.string().min(8, "A senha precisa de pelo menos 8 caracteres.").max(72);
 
-/** Só aceita redirecionamentos internos (evita open redirect). */
-function safeNext(value: FormDataEntryValue | null): string {
-  const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
-}
-
 export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {
   const parsed = z.object({ email, password: z.string().min(1, "Informe sua senha.") }).safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
@@ -29,7 +24,7 @@ export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {
     logger.warn("auth", "Login falhou", { reason: error.code });
     return { error: "E-mail ou senha incorretos." };
   }
-  redirect(safeNext(form.get("next")));
+  redirect(safeNextPath(form.get("next")));
 }
 
 export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {

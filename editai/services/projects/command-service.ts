@@ -1,7 +1,7 @@
 import { estimateRenderCredits } from "@/config/credits";
 import { getPlan } from "@/config/plans";
 import { AUDIO_MIME_TYPES, baseMime, MAX_AUDIO_COMMAND_MB, MAX_INSTRUCTION_CHARS } from "@/config/upload";
-import { EMPTY_PLAN, describePlan, type EditingPlan } from "@/lib/editing-plan";
+import { EMPTY_PLAN, describePlan, normalizeEditingPlan, plansEqual, type EditingPlan } from "@/lib/editing-plan";
 import { AppError, Errors } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -44,6 +44,7 @@ export interface CreateCommandInput {
  */
 export async function createEditingCommand(input: CreateCommandInput): Promise<EditingCommand & { needs_transcript_fallback?: boolean }> {
   const project = await getOwnedProject(input.userId, input.projectId);
+  if (!project.original_video_url) throw Errors.validation("Envie um vídeo para este projeto antes de dar instruções.");
   if (!project.current_version_id || project.status === "analyzing" || project.status === "uploading") {
     throw Errors.validation("Aguarde a análise do vídeo terminar para enviar instruções.");
   }
@@ -82,7 +83,8 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
         "Não conseguimos transcrever o áudio. Escreva sua instrução ou tente gravar novamente.",
       );
     }
-    instruction = transcription;
+    // A transcrição completa fica em `transcription`; a instrução respeita o limite.
+    instruction = sanitizeUserText(transcription, MAX_INSTRUCTION_CHARS);
     await db().from("media_assets").upsert(
       {
         user_id: input.userId,
@@ -116,6 +118,10 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
   const metadataRow = meta as VideoMetadataRow | null;
   const metadata = metadataRow?.metadata;
   if (!metadata) throw Errors.validation("A análise do vídeo ainda não terminou.");
+  const userPlan = await getUserPlan(input.userId);
+  if (metadata.duration > userPlan.maxVideoMinutes * 60) {
+    throw new AppError("FORBIDDEN", `Seu plano edita vídeos de até ${userPlan.maxVideoMinutes} minutos.`);
+  }
 
   const video: VideoContext = {
     duration: metadata.duration,
@@ -182,25 +188,36 @@ export async function confirmEditingCommand(userId: string, commandId: string) {
   const command = data as EditingCommand | null;
   if (!command) throw Errors.notFound("Comando");
   if (command.status !== "planned") throw new AppError("CONFLICT", "Essa edição já foi confirmada.");
-  const plan = command.editing_plan as EditingPlan;
+  const plan = normalizeEditingPlan(command.editing_plan as EditingPlan);
 
   const project = await getOwnedProject(userId, command.project_id);
+  if (command.base_version_id) {
+    const { data: base } = await client.from("project_versions").select("editing_plan").eq("id", command.base_version_id).maybeSingle();
+    if (base && plansEqual(plan, base.editing_plan as EditingPlan)) {
+      throw Errors.validation("Essa instrução não muda o vídeo. Diga o que você quer alterar.");
+    }
+  }
   const labelParts = describePlan(plan);
-  const label = labelParts.length ? labelParts.slice(0, 3).join(" + ") : "Sem edições";
+  const label = labelParts.length ? labelParts.slice(0, 3).join(" + ") : "Vídeo original";
 
-  const render = await enqueueRender({
-    userId,
-    project,
-    plan,
-    kind: "edit",
-    options: { quality: "720p" },
-    commandId: command.id,
-    newVersionLabel: label,
-  });
-  await client
+  // Transição atômica planned -> confirmed: dois cliques simultâneos não cobram duas vezes.
+  const { data: claimed } = await client
     .from("editing_commands")
-    .update({ status: "confirmed", result_version_id: render.version_id })
-    .eq("id", command.id);
+    .update({ status: "confirmed" })
+    .eq("id", command.id)
+    .eq("user_id", userId)
+    .eq("status", "planned")
+    .select("id");
+  if (!claimed?.length) throw new AppError("CONFLICT", "Essa edição já foi confirmada.");
+
+  let render;
+  try {
+    render = await enqueueRender({ userId, project, plan, kind: "edit", options: { quality: "720p" }, commandId: command.id, newVersionLabel: label });
+  } catch (e) {
+    await client.from("editing_commands").update({ status: "planned" }).eq("id", command.id).eq("status", "confirmed");
+    throw e;
+  }
+  await client.from("editing_commands").update({ result_version_id: render.version_id }).eq("id", command.id);
   return render;
 }
 
@@ -208,8 +225,11 @@ export async function discardEditingCommand(userId: string, commandId: string) {
   await db().from("editing_commands").update({ status: "discarded" }).eq("id", commandId).eq("user_id", userId).eq("status", "planned");
 }
 
-export async function getUserPlanQuality(userId: string): Promise<ExportQuality> {
+export async function getUserPlan(userId: string) {
   const { data } = await db().from("subscriptions").select("plan_id,status").eq("user_id", userId).maybeSingle();
-  const plan = getPlan(data?.status === "active" || data?.status === "trialing" ? data.plan_id : "free");
-  return plan.maxQuality;
+  return getPlan(data?.status === "active" || data?.status === "trialing" ? data.plan_id : "free");
+}
+
+export async function getUserPlanQuality(userId: string): Promise<ExportQuality> {
+  return (await getUserPlan(userId)).maxQuality;
 }

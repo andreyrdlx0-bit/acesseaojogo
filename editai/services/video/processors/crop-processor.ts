@@ -2,6 +2,9 @@ import { findOperation } from "@/lib/editing-plan/validate";
 import type { AspectRatio } from "@/lib/editing-plan";
 import { even, type OperationProcessor } from "./types";
 
+/** Par para baixo: o recorte nunca passa do tamanho real do quadro. */
+const evenFloor = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
+
 const RATIOS: Record<AspectRatio, number> = { "9:16": 9 / 16, "16:9": 16 / 9, "1:1": 1, "4:5": 4 / 5 };
 
 /**
@@ -14,8 +17,8 @@ export const CropProcessor: OperationProcessor = {
   apply(ctx) {
     const crop = findOperation(ctx.plan, "crop");
     if (crop) {
-      const w = even(Math.min(crop.width, 1 - crop.x) * ctx.frame.width);
-      const h = even(Math.min(crop.height, 1 - crop.y) * ctx.frame.height);
+      const w = evenFloor(Math.min(crop.width, 1 - crop.x) * ctx.frame.width);
+      const h = evenFloor(Math.min(crop.height, 1 - crop.y) * ctx.frame.height);
       const x = Math.round(crop.x * ctx.frame.width);
       const y = Math.round(crop.y * ctx.frame.height);
       ctx.graph.video.push(`crop=${w}:${h}:${x}:${y}`);
@@ -37,8 +40,8 @@ export const CropProcessor: OperationProcessor = {
       ctx.frame = { width: w, height: h };
     } else {
       // Recorte centralizado — enquadramento de rosto/assunto é um TODO de IA visual.
-      const w = current > target ? even(ctx.frame.height * target) : ctx.frame.width;
-      const h = current > target ? ctx.frame.height : even(ctx.frame.width / target);
+      const w = current > target ? evenFloor(ctx.frame.height * target) : evenFloor(ctx.frame.width);
+      const h = current > target ? evenFloor(ctx.frame.height) : evenFloor(ctx.frame.width / target);
       ctx.graph.video.push(`crop=${w}:${h}:(iw-${w})/2:(ih-${h})/2`);
       ctx.frame = { width: w, height: h };
     }

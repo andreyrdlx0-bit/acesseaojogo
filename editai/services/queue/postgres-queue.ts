@@ -52,14 +52,37 @@ export class PostgresRenderQueue implements RenderQueue {
     return count ?? 0;
   }
 
-  async complete(jobId: string) {
-    await this.db.from("jobs").update({ status: "completed", locked_at: null, last_error: null }).eq("id", jobId);
+  async complete(jobId: string, workerId: string): Promise<boolean> {
+    const { data } = await this.db
+      .from("jobs")
+      .update({ status: "completed", last_error: null })
+      .eq("id", jobId)
+      .eq("locked_by", workerId)
+      .eq("status", "processing")
+      .select("id");
+    return Boolean(data?.length);
   }
 
-  async fail(jobId: string, error: string, retry: boolean) {
+  async fail(jobId: string, workerId: string, error: string, retry: boolean): Promise<boolean> {
     const update = retry
       ? { status: "queued", locked_at: null, locked_by: null, last_error: error, run_after: new Date(Date.now() + 30_000).toISOString() }
-      : { status: "failed", locked_at: null, last_error: error };
-    await this.db.from("jobs").update(update).eq("id", jobId);
+      : { status: "failed", last_error: error };
+    const { data } = await this.db
+      .from("jobs")
+      .update(update)
+      .eq("id", jobId)
+      .eq("locked_by", workerId)
+      .eq("status", "processing")
+      .select("id");
+    return Boolean(data?.length);
+  }
+
+  async heartbeat(jobId: string, workerId: string): Promise<void> {
+    await this.db
+      .from("jobs")
+      .update({ locked_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .eq("locked_by", workerId)
+      .eq("status", "processing");
   }
 }

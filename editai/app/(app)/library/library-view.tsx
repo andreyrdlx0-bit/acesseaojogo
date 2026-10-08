@@ -66,7 +66,7 @@ export function LibraryView() {
         <input
           ref={input}
           type="file"
-          accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4"
+          accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/x-m4a,.mp3,.wav,.ogg,.m4a"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];

@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { normalizeEditingPlan, validateEditingPlan } from "@/lib/editing-plan";
 import { VIDEO_FAILURE_MESSAGE } from "@/lib/errors";
+import { isPermanentJobError, PermanentJobError } from "@/services/jobs/errors";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { creditService } from "@/services/credits/credit-service";
@@ -18,19 +19,24 @@ import { FfmpegVideoProcessor } from "./engine";
  *  4-7. gera e executa FFmpeg com progresso  8. armazena  9. registra URL
  *  10. atualiza status — e reembolsa créditos em caso de falha.
  */
+function maxUploadBytes(): number {
+  return Number(process.env.MAX_UPLOAD_MB || 50) * 1024 * 1024;
+}
+
 export class VideoProcessingService {
   constructor(
     private readonly processor: VideoProcessor = new FfmpegVideoProcessor(),
     private readonly tmpRoot = defaultTmpRoot(),
   ) {}
 
-  async runRender(renderId: string): Promise<void> {
+  async runRender(renderId: string, opts: { deadline?: number } = {}): Promise<void> {
     const db = createSupabaseAdminClient();
     const storage = getStorage();
     const { data: renderRow } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
     const render = renderRow as Render | null;
-    if (!render) throw new Error(`Render ${renderId} não encontrado`);
-    if (render.status === "completed") return;
+    if (!render) throw new PermanentJobError(`Render ${renderId} não encontrado`, VIDEO_FAILURE_MESSAGE);
+    // Concluído, ou já marcado como falho e reembolsado: nunca renderiza de novo.
+    if (render.status === "completed" || render.status === "failed") return;
 
     const [{ data: projectRow }, { data: versionRow }, { data: metaRow }] = await Promise.all([
       db.from("projects").select("*").eq("id", render.project_id).single(),
@@ -68,7 +74,20 @@ export class VideoProcessingService {
       let lastWrite = 0;
       const outputPath = path.join(workDir, "output.mp4");
       const result = await this.processor.process(
-        { sourcePath, outputPath, plan: normalizeEditingPlan(plan), metadata, options: render.options, assets, workDir },
+        {
+          sourcePath,
+          outputPath,
+          plan: normalizeEditingPlan(plan),
+          metadata,
+          options: render.options,
+          assets,
+          workDir,
+          limits: {
+            maxOutputBytes: maxUploadBytes(),
+            // Reserva ~45s para o upload e a gravação no banco antes do fim da função.
+            timeoutMs: opts.deadline ? Math.max(20_000, opts.deadline - Date.now() - 45_000) : undefined,
+          },
+        },
         (p) => {
           const now = Date.now();
           if (now - lastWrite < 1500 && p.percent < 97) return; // não martela o banco
@@ -129,22 +148,27 @@ export class VideoProcessingService {
     }
   }
 
-  /** Marca falha definitiva: status, mensagem amigável e reembolso. */
+  /** Marca falha definitiva: status, mensagem amigável e reembolso (idempotente). */
   async failRender(renderId: string, internalError: unknown): Promise<void> {
     const db = createSupabaseAdminClient();
     const { data } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
     const render = data as Render | null;
-    if (!render) return;
+    if (!render || render.status === "completed") return;
     logger.error("failure", "Render falhou", { renderId, error: internalError });
-    await db
-      .from("renders")
-      .update({ status: "failed", error: VIDEO_FAILURE_MESSAGE, stage: "failed", message: VIDEO_FAILURE_MESSAGE, completed_at: new Date().toISOString() })
-      .eq("id", renderId);
+    const userMessage = isPermanentJobError(internalError) ? internalError.userMessage : VIDEO_FAILURE_MESSAGE;
+    if (render.status !== "failed") {
+      const { error } = await db
+        .from("renders")
+        .update({ status: "failed", error: userMessage, stage: "failed", message: userMessage, completed_at: new Date().toISOString() })
+        .eq("id", renderId);
+      if (error) throw new Error(error.message);
+    }
     if (render.kind === "edit") {
-      await db.from("project_versions").update({ status: "failed" }).eq("id", render.version_id);
-      await db.from("projects").update({ status: "ready" }).eq("id", render.project_id);
+      await db.from("project_versions").update({ status: "failed" }).eq("id", render.version_id).neq("status", "ready");
+      await db.from("projects").update({ status: "ready" }).eq("id", render.project_id).eq("status", "processing");
       if (render.command_id) await db.from("editing_commands").update({ status: "failed" }).eq("id", render.command_id);
     }
+    // Idempotente: (reference_id, reason) é único em credit_transactions.
     await creditService.refundRender(render.user_id, render.credits_charged, render.id);
   }
 

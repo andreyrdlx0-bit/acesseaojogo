@@ -1,4 +1,5 @@
 import { apiRoute } from "@/lib/api/handler";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 import { runNextJob } from "@/services/jobs/job-runner";
 import { getQueue } from "@/services/queue";
 
@@ -21,9 +22,11 @@ export const POST = apiRoute(
       userId: user.id,
       // Funções duram no máximo 300s: um job "preso" há 6+ min pode ser retomado.
       staleMinutes: 6,
+      // maxDuration = 300s: deixa margem para responder e registrar o resultado.
+      timeBudgetMs: 280_000,
     });
     const pending = await getQueue().countQueued(user.id);
     return { processed: result.job ? { ...result.job, status: result.status } : null, pending, inline: true };
   },
-  { rateLimit: { limit: 30, windowMs: 60_000 }, rateLimitKey: "jobs-run" },
+  { rateLimit: RATE_LIMITS.jobs, rateLimitKey: "jobs-run" },
 );

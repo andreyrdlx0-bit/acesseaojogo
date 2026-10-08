@@ -88,7 +88,10 @@ export async function enqueueRender(input: EnqueueInput): Promise<Render> {
     })
     .select("*")
     .single();
-  if (error || !render) throw new Error(error?.message);
+  if (error || !render) {
+    if (createdVersion) await client.from("project_versions").delete().eq("id", versionId);
+    throw new Error(error?.message);
+  }
 
   try {
     await creditService.consume(input.userId, credits, input.kind === "export" ? "export" : "render", render.id, `${input.kind === "export" ? "Exportação" : "Edição"}: ${input.project.name}`);
@@ -98,7 +101,17 @@ export async function enqueueRender(input: EnqueueInput): Promise<Render> {
     throw e;
   }
 
-  await getQueue().enqueue("render", input.userId, { renderId: render.id }, { priority: plan.priority });
+  try {
+    await getQueue().enqueue("render", input.userId, { renderId: render.id }, { priority: plan.priority });
+  } catch (e) {
+    // Compensação: devolve os créditos e remove render/versão que nunca rodarão.
+    await creditService
+      .refundRender(input.userId, credits, render.id)
+      .catch((err) => logger.error("credits", "Falha ao reembolsar após erro de enfileiramento", { renderId: render.id, error: err }));
+    await client.from("renders").delete().eq("id", render.id);
+    if (createdVersion) await client.from("project_versions").delete().eq("id", versionId);
+    throw e;
+  }
   if (input.kind === "edit") await client.from("projects").update({ status: "processing" }).eq("id", input.project.id);
   logger.info(input.kind === "export" ? "export" : "render", "Render enfileirado", {
     userId: input.userId,

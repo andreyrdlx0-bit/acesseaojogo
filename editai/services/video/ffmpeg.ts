@@ -113,7 +113,7 @@ function runProcess(bin: string, args: string[], options: RunOptions): Promise<{
       if (stderr.length > 200_000) stderr = stderr.slice(-100_000);
     });
     child.on("error", (err: NodeJS.ErrnoException) => {
-      finish(() => reject(new FfmpegError(`Não foi possível executar ${bin}: ${err.message}`, null, "", err.code === "ENOENT")));
+      finish(() => reject(new FfmpegError(`Não foi possível executar ${bin}: ${err.message}`, null, "", err.code === "ENOENT" || err.code === "EACCES")));
     });
     child.on("close", (code) => {
       finish(() =>

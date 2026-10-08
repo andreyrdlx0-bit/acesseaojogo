@@ -8,6 +8,7 @@ import type { Project } from "@/types/domain";
 import type { VideoAnalyzer } from "@/types/services";
 import { storagePaths } from "@/utils/storage-paths";
 import { defaultTmpRoot } from "./fonts";
+import { isPermanentJobError, PermanentJobError } from "@/services/jobs/errors";
 import { extractSpeechAudio, extractThumbnail, FfmpegVideoAnalyzer } from "./analyzer";
 
 const STT_MAX_BYTES = 24 * 1024 * 1024;
@@ -27,7 +28,9 @@ export class VideoAnalysisService {
     const storage = getStorage();
     const { data } = await db.from("projects").select("*").eq("id", projectId).maybeSingle();
     const project = data as Project | null;
-    if (!project?.original_video_url) throw new Error("Projeto sem vídeo");
+    if (!project?.original_video_url) throw new PermanentJobError("Projeto sem vídeo", "Envie um vídeo para este projeto.");
+    const { data: existing } = await db.from("video_metadata").select("analysis_status").eq("project_id", projectId).maybeSingle();
+    if (existing?.analysis_status === "completed") return; // já analisado (job repetido)
 
     const workDir = path.resolve(this.tmpRoot, `analyze-${projectId}`);
     await mkdir(workDir, { recursive: true });
@@ -38,7 +41,12 @@ export class VideoAnalysisService {
       const metadata = await this.analyzer.analyze(source);
 
       const maxSeconds = Number(process.env.MAX_VIDEO_SECONDS || 900);
-      if (metadata.duration > maxSeconds) throw new Error(`Vídeo excede ${maxSeconds}s`);
+      if (metadata.duration > maxSeconds) {
+        throw new PermanentJobError(
+          `Vídeo excede ${maxSeconds}s`,
+          `Esse vídeo é longo demais. O limite é de ${Math.floor(maxSeconds / 60)} minutos.`,
+        );
+      }
 
       const thumbLocal = path.join(workDir, "thumbnail.jpg");
       await extractThumbnail(source, thumbLocal, metadata.duration);
@@ -49,7 +57,7 @@ export class VideoAnalysisService {
       if (metadata.hasAudio && stt.isConfigured) {
         try {
           const audioLocal = path.join(workDir, "speech.mp3");
-          await extractSpeechAudio(source, audioLocal);
+          await extractSpeechAudio(source, audioLocal, maxSeconds);
           const { size } = await stat(audioLocal);
           if (size > STT_MAX_BYTES) {
             logger.warn("transcription", "Áudio grande demais para STT; transcrição ignorada", { projectId, size });
@@ -99,7 +107,12 @@ export class VideoAnalysisService {
     logger.error("failure", "Análise falhou", { projectId, error });
     await db
       .from("video_metadata")
-      .update({ analysis_status: "failed", analysis_error: "Não conseguimos processar esse vídeo. Verifique o formato ou tente novamente." })
+      .update({
+        analysis_status: "failed",
+        analysis_error: isPermanentJobError(error)
+          ? error.userMessage
+          : "Não conseguimos processar esse vídeo. Verifique o formato ou tente novamente.",
+      })
       .eq("project_id", projectId);
     await db.from("projects").update({ status: "failed" }).eq("id", projectId);
   }

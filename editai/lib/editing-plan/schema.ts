@@ -18,13 +18,15 @@ const timeRange = z
 
 const base = { enabled: z.boolean().default(true) };
 
-export const trimOp = z.object({
-  type: z.literal("trim"),
-  ...base,
-  /** Mantém apenas o trecho [start, end] do vídeo original. */
-  start: seconds.default(0),
-  end: seconds.optional(),
-});
+export const trimOp = z
+  .object({
+    type: z.literal("trim"),
+    ...base,
+    /** Mantém apenas o trecho [start, end] do vídeo original. */
+    start: seconds.default(0),
+    end: seconds.optional(),
+  })
+  .refine((t) => t.end === undefined || t.end > t.start, { message: "end deve ser maior que start" });
 
 export const cutOp = z.object({
   type: z.literal("cut"),

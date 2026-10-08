@@ -2,7 +2,9 @@ import { stat } from "node:fs/promises";
 import { findOperation } from "@/lib/editing-plan/validate";
 import type { ProcessProgress, VideoProcessInput, VideoProcessResult, VideoProcessor } from "@/types/services";
 import { detectSilences, probeFile } from "./analyzer";
-import { runFfmpeg } from "./ffmpeg";
+import { PermanentJobError } from "@/services/jobs/errors";
+import { FfmpegError, runFfmpeg } from "./ffmpeg";
+import { normalizeFps } from "./fps";
 import { PROCESSOR_PIPELINE, type FilterGraph, type ProcessorContext } from "./processors";
 import { buildTimeline, mapWordsToOutput } from "./timeline";
 
@@ -62,18 +64,36 @@ export class FfmpegVideoProcessor implements VideoProcessor {
       await processor.apply(ctx);
     }
 
-    const args = buildFfmpegArgs(input, ctx.graph, metadata.hasAudio, timeline.outputDuration, ctx.fps);
+    const args = buildFfmpegArgs(input, ctx.graph, metadata.hasAudio, timeline.outputDuration, ctx.fps, input.limits?.maxOutputBytes);
     report(25, "render");
-    await runFfmpeg(args, {
-      expectedDuration: timeline.outputDuration,
-      onProgress: (fraction) => report(25 + fraction * 70, "render"),
-      timeoutMs: Math.max(5 * 60_000, timeline.outputDuration * 20_000),
-    });
+    const timeoutMs = input.limits?.timeoutMs ?? Math.max(5 * 60_000, timeline.outputDuration * 20_000);
+    try {
+      await runFfmpeg(args, {
+        expectedDuration: timeline.outputDuration,
+        onProgress: (fraction) => report(25 + fraction * 70, "render"),
+        timeoutMs,
+      });
+    } catch (error) {
+      if (error instanceof FfmpegError && error.exitCode === null && !error.notFound) {
+        // Estourou o tempo: tentar de novo daria o mesmo resultado.
+        throw new PermanentJobError(
+          `Renderização excedeu ${Math.round(timeoutMs / 1000)}s`,
+          "Esse vídeo é longo demais para processar aqui. Tente um trecho menor ou uma versão mais curta.",
+        );
+      }
+      throw error;
+    }
 
     report(97, "finalize");
     const probe = await probeFile(input.outputPath);
     const v = probe.streams.find((s) => s.codec_type === "video");
     const size = (await stat(input.outputPath)).size;
+    if (input.limits?.maxOutputBytes && size > input.limits.maxOutputBytes) {
+      throw new PermanentJobError(
+        `Saída com ${size} bytes excede o limite de ${input.limits.maxOutputBytes}`,
+        "O vídeo final ficou maior que o limite de armazenamento. Tente uma versão mais curta ou em 720p.",
+      );
+    }
     return {
       outputPath: input.outputPath,
       duration: Number(probe.format.duration ?? timeline.outputDuration),
@@ -91,6 +111,7 @@ export function buildFfmpegArgs(
   hasAudio: boolean,
   outputDuration: number,
   fps: number,
+  maxOutputBytes?: number,
 ): string[] {
   const parts: string[] = [];
   parts.push(`[0:v]${chain(graph.video, "null")}[vout]`);
@@ -129,6 +150,8 @@ export function buildFfmpegArgs(
     "veryfast",
     "-crf",
     "21",
+    // Teto de bitrate: mantém o arquivo final dentro do limite do storage.
+    ...bitrateCap(outputDuration, maxOutputBytes, Boolean(audioLabel)),
     "-pix_fmt",
     "yuv420p",
     "-r",
@@ -140,12 +163,14 @@ export function buildFfmpegArgs(
   return args;
 }
 
+function bitrateCap(outputDuration: number, maxOutputBytes: number | undefined, hasAudio: boolean): string[] {
+  if (!maxOutputBytes || outputDuration <= 0) return [];
+  const budgetKbits = (maxOutputBytes * 0.9 * 8) / 1000;
+  const videoKbps = Math.max(250, Math.floor(budgetKbits / outputDuration) - (hasAudio ? 160 : 0));
+  return ["-maxrate", `${videoKbps}k`, "-bufsize", `${videoKbps * 2}k`];
+}
+
 function chain(filters: string[], fallback: string): string {
   return filters.length ? filters.join(",") : fallback;
 }
 
-function normalizeFps(fps: number): number {
-  if (!Number.isFinite(fps) || fps <= 0) return 30;
-  if (fps > 50) return 60;
-  return Math.round(fps) || 30;
-}

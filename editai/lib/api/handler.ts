@@ -36,7 +36,7 @@ export function apiRoute<P extends RouteParams = RouteParams>(
       const user = await requireUser();
       const rule = options.rateLimit ?? RATE_LIMITS.default;
       const key = `${options.rateLimitKey ?? request.nextUrl.pathname.split("/").slice(0, 3).join("/")}:${user.id}`;
-      if (!checkRateLimit(key, rule)) throw Errors.rateLimited();
+      if (!(await checkRateLimit(key, rule))) throw Errors.rateLimited();
       const params = (await context.params) ?? ({} as P);
       const result = await handler({ user, params, request });
       if (result instanceof NextResponse) return result;

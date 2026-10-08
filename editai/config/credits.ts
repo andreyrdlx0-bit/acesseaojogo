@@ -22,7 +22,11 @@ export function estimateRenderCredits(input: {
   const shorten = findOperation(input.plan, "shorten");
   const trim = findOperation(input.plan, "trim");
   let effective = input.sourceDurationSeconds;
-  if (trim) effective = Math.min(effective, (trim.end ?? effective) - trim.start);
+  if (trim) {
+    // Mesma regra do buildTimeline: trim inválido é ignorado (vídeo inteiro).
+    const end = Math.min(trim.end ?? effective, effective);
+    if (trim.start < end) effective = end - trim.start;
+  }
   if (shorten) effective = Math.min(effective, shorten.targetSeconds);
 
   let credits = Math.max(1, Math.ceil(effective / 30));

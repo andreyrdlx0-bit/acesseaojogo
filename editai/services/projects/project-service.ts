@@ -54,7 +54,7 @@ export async function createProject(userId: string, rawName: string): Promise<Pr
 export async function listProjects(userId: string, limit = 50): Promise<ProjectSummary[]> {
   const { data, error } = await db()
     .from("projects")
-    .select("*, video_metadata(duration), project_versions(version_number)")
+    .select("*, video_metadata(duration), project_versions!project_versions_project_id_fkey(version_number)")
     .eq("user_id", userId)
     .neq("status", "archived")
     .order("updated_at", { ascending: false })
