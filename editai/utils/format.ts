@@ -22,7 +22,10 @@ export function formatBytes(bytes: number | null | undefined): string {
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+  // Fuso fixo: servidor e navegador geram o mesmo texto (sem erro de hidratação).
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" }).format(
+    new Date(iso),
+  );
 }
 
 export function formatRelative(iso: string): string {

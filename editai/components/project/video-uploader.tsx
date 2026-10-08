@@ -52,11 +52,14 @@ async function inspectVideo(file: File): Promise<LocalVideoInfo> {
 export function VideoUploader({
   projectId,
   maxMb,
+  maxMinutes,
   onUploaded,
   ensureProject,
 }: {
   projectId?: string;
   maxMb: number;
+  /** Duração máxima do plano do usuário (verificada antes de enviar). */
+  maxMinutes?: number;
   /** Chamado após o upload ser confirmado no servidor. */
   onUploaded: (projectId: string, info: LocalVideoInfo) => void;
   /** Cria o projeto sob demanda (página /projects/new). */
@@ -86,6 +89,11 @@ export function VideoUploader({
         setPhase("reading");
         const local = await inspectVideo(file).catch(() => ({ file, duration: 0, width: 0, height: 0, thumbnail: null }));
         setInfo(local);
+        if (maxMinutes && Number.isFinite(local.duration) && local.duration > maxMinutes * 60) {
+          setError(`Seu plano edita vídeos de até ${maxMinutes} minutos. Envie um trecho mais curto.`);
+          setPhase("error");
+          return;
+        }
         const id = projectId ?? (await ensureProject(file.name));
         setPhase("uploading");
         const signed = await api.post<{ signedUrl: string; path: string }>(`/api/projects/${id}/upload`, {
@@ -103,7 +111,7 @@ export function VideoUploader({
         setPhase("error");
       }
     },
-    [ensureProject, maxMb, onUploaded, projectId],
+    [ensureProject, maxMb, maxMinutes, onUploaded, projectId],
   );
 
   const busy = phase === "reading" || phase === "uploading" || phase === "finalizing";

@@ -5,12 +5,17 @@ import { AuthForm } from "../auth-form";
 
 export const metadata = { title: "Entrar" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const { next, error } = await searchParams;
   return (
     <>
       <h1 className="font-display text-4xl">Bem-vindo de volta</h1>
       <p className="mb-8 mt-2 text-muted-foreground">Entre para continuar editando com a voz.</p>
+      {error === "link_invalido" && (
+        <p role="alert" className="mb-6 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          Link inválido ou expirado. Abra o link no mesmo navegador em que fez o pedido ou solicite um novo.
+        </p>
+      )}
       <AuthForm action={signIn} submitLabel="Entrar">
         <input type="hidden" name="next" value={next ?? "/dashboard"} />
         <div className="grid gap-2">

@@ -5,25 +5,29 @@ import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { describeOperation } from "@/lib/editing-plan";
+import { describeOperation, plansEqual, type EditingPlan } from "@/lib/editing-plan";
 import type { EditingCommand, Render } from "@/types/domain";
 
 /** "Entendi sua instrução:" + plano + custo + [Confirmar edição]. */
 export function TranscriptViewer({
   command,
   balance,
+  basePlan,
   onConfirmed,
   onDiscarded,
 }: {
   command: EditingCommand;
   balance: number;
+  /** Plano da versão de partida: se o novo plano for igual, não há o que renderizar. */
+  basePlan: EditingPlan | null;
   onConfirmed: (render: Render) => void;
   onDiscarded: () => void;
 }) {
   const [pending, setPending] = useState<"confirm" | "discard" | null>(null);
   const [error, setError] = useState<{ message: string; credits?: boolean } | null>(null);
   const ops = command.editing_plan.operations;
-  const insufficient = balance < command.estimated_credits;
+  const unchanged = basePlan ? plansEqual(command.editing_plan, basePlan) : ops.length === 0;
+  const insufficient = !unchanged && balance < command.estimated_credits;
 
   async function confirm() {
     setPending("confirm");
@@ -74,14 +78,18 @@ export function TranscriptViewer({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <p className="text-sm text-muted-foreground">
-          Custo: <span className="font-medium text-foreground">{command.estimated_credits} crédito(s)</span> · saldo {balance}
-        </p>
+        {unchanged ? (
+          <p className="text-sm text-muted-foreground">Essa instrução não muda o vídeo. Descarte e diga o que você quer alterar.</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Custo: <span className="font-medium text-foreground">{command.estimated_credits} crédito(s)</span> · saldo {balance}
+          </p>
+        )}
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={discard} disabled={pending !== null}>
             {pending === "discard" ? <Loader2 className="animate-spin" /> : <X />} Descartar
           </Button>
-          <Button variant="accent" onClick={confirm} disabled={pending !== null || ops.length === 0 || insufficient}>
+          <Button variant="accent" onClick={confirm} disabled={pending !== null || unchanged || insufficient}>
             {pending === "confirm" ? <Loader2 className="animate-spin" /> : <Check />} Confirmar edição
           </Button>
         </div>

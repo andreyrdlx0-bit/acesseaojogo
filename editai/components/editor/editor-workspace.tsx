@@ -1,11 +1,14 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/api/client";
 import { kickJobs } from "@/api/job-runner";
 import { ErrorState } from "@/components/app/states";
 import { ProjectStatusBadge } from "@/components/project/status-badge";
+import { VideoUploader } from "@/components/project/video-uploader";
+import { Button } from "@/components/ui/button";
 import { usePolling } from "@/hooks/use-polling";
 import { describePlan } from "@/lib/editing-plan";
 import type { ProjectDetail } from "@/services/projects/project-service";
@@ -28,11 +31,16 @@ export function EditorWorkspace({
   initial,
   initialBalance,
   maxQuality,
+  maxMb,
+  maxMinutes,
 }: {
   initial: ProjectDetail;
   initialBalance: number;
   maxQuality: ExportQuality;
+  maxMb: number;
+  maxMinutes: number;
 }) {
+  const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [balance, setBalance] = useState(initialBalance);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(initial.project.current_version_id);
@@ -55,7 +63,7 @@ export function EditorWorkspace({
       setDetail((prev) => {
         // Quando um render termina, a nova versão vira a selecionada.
         if (next.project.current_version_id !== prev.project.current_version_id) setSelectedVersionId(next.project.current_version_id);
-        return next;
+        return keepSignedUrls(prev, next);
       });
       setBalance(credits.balance);
       setLoadError(null);
@@ -64,7 +72,15 @@ export function EditorWorkspace({
     }
   }, [project.id]);
 
-  const hasPendingWork = Boolean(activeRender) || analyzing;
+  // Qualquer render pendente (edição ou exportação) mantém o processamento vivo.
+  const hasPendingWork = renders.some((r) => r.status === "queued" || r.status === "processing") || analyzing;
+
+  // Saldo do cabeçalho (layout) acompanha cobranças e reembolsos.
+  const hadActiveRender = useRef(Boolean(activeRender));
+  useEffect(() => {
+    if (hadActiveRender.current && !activeRender) router.refresh();
+    hadActiveRender.current = Boolean(activeRender);
+  }, [activeRender, router]);
   const lastKick = useRef(0);
   const kick = useCallback(() => {
     lastKick.current = Date.now();
@@ -107,6 +123,13 @@ export function EditorWorkspace({
     setPendingCommand(null);
     setDetail((d) => ({ ...d, renders: [{ ...render, signed_url: null }, ...d.renders], project: { ...d.project, status: "processing" } }));
     void refresh();
+    router.refresh();
+  }
+
+  async function deleteProject() {
+    await api.delete(`/api/projects/${project.id}`).catch(() => undefined);
+    router.push("/projects");
+    router.refresh();
   }
 
   return (
@@ -125,6 +148,10 @@ export function EditorWorkspace({
           sourceDuration={metadata?.metadata?.duration ?? 0}
           maxQuality={maxQuality}
           balance={balance}
+          onCreditsChanged={() => {
+            void refresh();
+            router.refresh();
+          }}
         />
       </div>
 
@@ -133,6 +160,7 @@ export function EditorWorkspace({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="flex min-w-0 flex-col gap-5">
           <VideoPreview
+            videoKey={selected?.id}
             src={selected?.status === "ready" ? (versions.find((v) => v.id === selected.id)?.signed_url ?? null) : null}
             poster={detail.thumbnailUrl}
             label={selected ? `Versão ${selected.version_number}${selected.version_number === 1 ? " · original" : ""}` : undefined}
@@ -192,14 +220,31 @@ export function EditorWorkspace({
         </div>
 
         <aside className="flex flex-col gap-5 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto">
-          {analyzing ? (
+          {!project.original_video_url ? (
+            <section className="flex flex-col gap-4 rounded-3xl border border-border bg-card p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Envie o vídeo deste projeto</h2>
+              <VideoUploader
+                projectId={project.id}
+                maxMb={maxMb}
+                maxMinutes={maxMinutes}
+                ensureProject={async () => project.id}
+                onUploaded={() => void refresh()}
+              />
+            </section>
+          ) : analyzing ? (
             <AIProcessingStatus title="Analisando vídeo..." description="Medindo duração, áudio, silêncios e fala. Em instantes você poderá dar instruções." />
           ) : project.status === "failed" || metadata?.analysis_status === "failed" ? (
-            <ErrorState message={metadata?.analysis_error ?? "Não conseguimos processar esse vídeo. Verifique o formato ou tente novamente."} />
+            <div className="flex flex-col gap-3">
+              <ErrorState message={metadata?.analysis_error ?? "Não conseguimos processar esse vídeo. Verifique o formato ou tente novamente."} />
+              <Button variant="outline" onClick={deleteProject}>
+                <Trash2 /> Excluir projeto e enviar outro vídeo
+              </Button>
+            </div>
           ) : pendingCommand ? (
             <TranscriptViewer
               command={pendingCommand}
               balance={balance}
+              basePlan={versions.find((v) => v.id === pendingCommand.base_version_id)?.editing_plan ?? null}
               onConfirmed={onRenderStarted}
               onDiscarded={() => {
                 setPendingCommand(null);
@@ -232,4 +277,32 @@ export function EditorWorkspace({
       </div>
     </div>
   );
+}
+
+/**
+ * Mantém as URLs assinadas já carregadas enquanto o arquivo não muda: evita que
+ * o player reinicie a cada atualização (cada URL nova recarrega o vídeo).
+ * As URLs valem 1h; após ~50min usamos as novas.
+ */
+const signedAt = { current: Date.now() };
+function keepSignedUrls(prev: ProjectDetail, next: ProjectDetail): ProjectDetail {
+  if (Date.now() - signedAt.current > 50 * 60_000) {
+    signedAt.current = Date.now();
+    return next;
+  }
+  const byPath = new Map(prev.versions.map((v) => [v.video_url, v.signed_url]));
+  const renderByPath = new Map(prev.renders.map((r) => [r.output_url, r.signed_url]));
+  return {
+    ...next,
+    versions: next.versions.map((v) => {
+      const old = v.video_url ? byPath.get(v.video_url) : null;
+      return old ? { ...v, signed_url: old } : v;
+    }),
+    renders: next.renders.map((r) => {
+      const old = r.output_url ? renderByPath.get(r.output_url) : null;
+      return old ? { ...r, signed_url: old } : r;
+    }),
+    originalUrl: prev.project.original_video_url === next.project.original_video_url && prev.originalUrl ? prev.originalUrl : next.originalUrl,
+    thumbnailUrl: prev.project.thumbnail_url === next.project.thumbnail_url && prev.thumbnailUrl ? prev.thumbnailUrl : next.thumbnailUrl,
+  };
 }

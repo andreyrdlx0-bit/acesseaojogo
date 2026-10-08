@@ -22,8 +22,8 @@ export class SupabaseStorageProvider implements StorageProvider {
     return { path: data.path, token: data.token, signedUrl: data.signedUrl };
   }
 
-  async createSignedUrl(path: string, expiresInSeconds: number): Promise<string> {
-    const { data, error } = await this.store.createSignedUrl(path, expiresInSeconds);
+  async createSignedUrl(path: string, expiresInSeconds: number, opts?: { download?: string }): Promise<string> {
+    const { data, error } = await this.store.createSignedUrl(path, expiresInSeconds, opts?.download ? { download: opts.download } : undefined);
     if (error || !data) throw new Error(`Falha ao assinar URL: ${error?.message}`);
     return data.signedUrl;
   }

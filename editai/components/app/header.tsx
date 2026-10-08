@@ -15,9 +15,14 @@ export function Header({ email, name, balance }: { email: string; name: string |
       <div className="hidden lg:block" />
       <div className="flex items-center gap-3">
         <CreditBalance balance={balance} />
-        <span className="grid size-9 place-items-center rounded-full bg-muted text-sm font-medium" title={email}>
+        <Link
+          href="/settings"
+          aria-label="Configurações da conta"
+          title={email}
+          className="grid size-9 place-items-center rounded-full bg-muted text-sm font-medium transition-colors hover:bg-muted/70"
+        >
           {initials}
-        </span>
+        </Link>
         <form action={signOut}>
           <Button type="submit" variant="ghost" size="icon" aria-label="Sair">
             <LogOut />

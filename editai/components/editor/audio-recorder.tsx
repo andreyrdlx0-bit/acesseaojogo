@@ -31,7 +31,7 @@ export function AudioRecorder({
     if (rec.state === "recorded" && rec.blob) onRecorded({ blob: rec.blob, duration: rec.seconds, browserTranscript: rec.liveTranscript });
     if (rec.state === "idle") onRecorded(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec.state, rec.blob]);
+  }, [rec.state, rec.blob, rec.liveTranscript]);
 
   if (rec.state === "recording" || rec.state === "paused" || rec.state === "requesting") {
     return (

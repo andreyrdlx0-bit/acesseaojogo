@@ -5,7 +5,6 @@
  */
 export function safeNextPath(value: unknown, fallback = "/dashboard"): string {
   const next = typeof value === "string" ? value : "";
-  // eslint-disable-next-line no-control-regex
   if (!next.startsWith("/") || /[\\\u0000-\u001f\u007f]/.test(next)) return fallback;
   try {
     const url = new URL(next, "http://editai.invalid");

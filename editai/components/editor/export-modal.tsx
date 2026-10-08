@@ -2,7 +2,7 @@
 
 import { Download, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { kickJobs } from "@/api/job-runner";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const RATIOS: { value: AspectRatio; label: string; hint: string }[] = [
   { value: "1:1", label: "1:1", hint: "Feed quadrado" },
 ];
 
-type RenderWithUrl = Render & { signed_url?: string | null };
+type RenderWithUrl = Render & { signed_url?: string | null; download_url?: string | null };
 
 export function ExportModal({
   projectId,
@@ -29,13 +29,17 @@ export function ExportModal({
   sourceDuration,
   maxQuality,
   balance,
+  onCreditsChanged,
 }: {
   projectId: string;
   version: ProjectVersion | null;
   sourceDuration: number;
   maxQuality: ExportQuality;
   balance: number;
+  /** Chamado quando créditos são cobrados ou devolvidos (atualiza o saldo na tela). */
+  onCreditsChanged?: () => void;
 }) {
+  const lastKick = useRef(0);
   const [open, setOpen] = useState(false);
   const [ratio, setRatio] = useState<AspectRatio>("9:16");
   const [quality, setQuality] = useState<ExportQuality>(maxQuality);
@@ -51,7 +55,12 @@ export function ExportModal({
       if (!render) return;
       const { render: r } = await api.get<{ render: RenderWithUrl }>(`/api/renders/${render.id}`);
       setRender(r);
-      if (r.status === "queued") void kickJobs();
+      // Pendente (inclusive "processing" de uma tentativa interrompida): continua disparando.
+      if ((r.status === "queued" || r.status === "processing") && (r.status === "queued" || Date.now() - lastKick.current > 15_000)) {
+        lastKick.current = Date.now();
+        void kickJobs();
+      }
+      if (r.status === "completed" || r.status === "failed") onCreditsChanged?.();
     },
     1500,
     Boolean(running),
@@ -64,7 +73,9 @@ export function ExportModal({
     try {
       const { render: r } = await api.post<{ render: Render }>(`/api/projects/${projectId}/exports`, { versionId: version.id, aspectRatio: ratio, quality });
       setRender(r);
+      lastKick.current = Date.now();
       void kickJobs();
+      onCreditsChanged?.();
     } catch (e) {
       const err = e instanceof ApiError ? e : null;
       setError({ message: err?.message ?? "Não foi possível exportar.", credits: err?.code === "INSUFFICIENT_CREDITS" });
@@ -158,7 +169,7 @@ export function ExportModal({
                   <Stat label="Tamanho" value={formatBytes(render.output_size_bytes)} />
                 </dl>
                 <Button asChild variant="accent" size="lg">
-                  <a href={render.signed_url} download={`editai-v${version?.version_number}-${ratio.replace(":", "x")}.mp4`}>
+                  <a href={render.download_url ?? render.signed_url} rel="noopener">
                     <Download /> Baixar vídeo
                   </a>
                 </Button>

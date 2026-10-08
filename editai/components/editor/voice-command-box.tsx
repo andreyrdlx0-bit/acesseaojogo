@@ -33,9 +33,11 @@ export function VoiceCommandBox({
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [autopilot, setAutopilot] = useState(false);
+  const [recorderKey, setRecorderKey] = useState(0);
   const busy = phase === "uploading" || phase === "transcribing";
 
   async function submit(kind: "audio" | "text") {
+    if (kind === "audio" && !audio) return;
     setError(null);
     try {
       let body: Record<string, unknown> = { mode: autopilot ? "autopilot" : "edit", baseVersionId: baseVersionId ?? undefined };
@@ -55,6 +57,7 @@ export function VoiceCommandBox({
       const { command } = await api.post<{ command: EditingCommand }>(`/api/projects/${projectId}/commands`, body);
       setText("");
       setAudio(null);
+      setRecorderKey((k) => k + 1); // descarta a gravação só depois do sucesso
       setPhase("idle");
       onPlanned(command);
     } catch (e) {
@@ -73,19 +76,22 @@ export function VoiceCommandBox({
         </label>
       </div>
 
-      {busy ? (
+      {busy && (
         <div className="flex items-center gap-3 rounded-2xl bg-muted/60 px-5 py-6 text-sm">
           <Loader2 className="size-4 animate-spin text-accent" />
           {phase === "uploading" ? "Enviando seu áudio..." : "Ouvindo e interpretando sua instrução..."}
         </div>
-      ) : (
+      )}
+      {/* Continua montado durante o envio: em caso de erro, a gravação não se perde. */}
+      <div className={busy ? "hidden" : undefined}>
         <AudioRecorder
+          key={recorderKey}
           onRecorded={setAudio}
           onSubmit={() => void submit("audio")}
-          disabled={disabled}
+          disabled={disabled || busy}
           primaryLabel={hasEdits ? "🎙️ ALTERAR VÍDEO" : "🎙️ Pressione para falar"}
         />
-      )}
+      </div>
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-border" /> ou <span className="h-px flex-1 bg-border" />

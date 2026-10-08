@@ -12,11 +12,12 @@ export const metadata = { title: "Início" };
 export default async function DashboardPage() {
   const user = await requireUserOrRedirect("/dashboard");
   const supabase = await createSupabaseServerClient();
-  const [projects, { data: credits }, { count: processed }, { data: profile }] = await Promise.all([
+  const [projects, { data: credits }, { count: processed }, { data: profile }, { count: projectCount }] = await Promise.all([
     listProjects(user.id, 6),
     supabase.from("credits").select("balance").maybeSingle(),
     supabase.from("renders").select("id", { count: "exact", head: true }).eq("status", "completed"),
     supabase.from("users").select("full_name").maybeSingle(),
+    supabase.from("projects").select("id", { count: "exact", head: true }).neq("status", "archived"),
   ]);
   const firstName = profile?.full_name?.split(" ")[0];
 
@@ -36,7 +37,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat icon={Coins} label="Créditos disponíveis" value={credits?.balance ?? 0} href="/billing" />
-        <Stat icon={FolderOpen} label="Projetos" value={projects.length} href="/projects" />
+        <Stat icon={FolderOpen} label="Projetos" value={projectCount ?? projects.length} href="/projects" />
         <Stat icon={Film} label="Vídeos processados" value={processed ?? 0} href="/library" />
       </div>
 

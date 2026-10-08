@@ -117,7 +117,8 @@ export interface SignedUpload {
 
 export interface StorageProvider {
   createSignedUploadUrl(path: string): Promise<SignedUpload>;
-  createSignedUrl(path: string, expiresInSeconds: number): Promise<string>;
+  /** `download`: força o navegador a baixar (Content-Disposition) com esse nome. */
+  createSignedUrl(path: string, expiresInSeconds: number, opts?: { download?: string }): Promise<string>;
   createSignedUrls(paths: string[], expiresInSeconds: number): Promise<Record<string, string>>;
   exists(path: string): Promise<{ exists: boolean; sizeBytes: number | null }>;
   downloadToFile(path: string, localPath: string): Promise<void>;

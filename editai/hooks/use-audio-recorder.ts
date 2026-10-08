@@ -39,6 +39,10 @@ export function useAudioRecorder() {
   const analyserFrame = useRef<number | null>(null);
   const audioCtx = useRef<AudioContext | null>(null);
   const cancelled = useRef(false);
+  /** Sessão de gravação atual: callbacks de sessões canceladas/antigas são ignorados. */
+  const session = useRef(0);
+  /** Resolve quando o reconhecimento de voz do navegador entrega o resultado final. */
+  const recognitionEnded = useRef<Promise<void>>(Promise.resolve());
 
   const cleanup = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
@@ -72,6 +76,7 @@ export function useAudioRecorder() {
     setLiveTranscript("");
     finalText.current = "";
     cancelled.current = false;
+    const id = ++session.current;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setState("error");
       setError("Seu navegador não permite gravar áudio. Escreva sua instrução.");
@@ -80,15 +85,24 @@ export function useAudioRecorder() {
     setState("requesting");
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (id !== session.current) {
+        // Cancelado enquanto o navegador pedia permissão.
+        media.getTracks().forEach((t) => t.stop());
+        return;
+      }
       stream.current = media;
       const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((m) => MediaRecorder.isTypeSupported(m));
       const rec = new MediaRecorder(media, mime ? { mimeType: mime } : undefined);
       chunks.current = [];
       rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
-      rec.onstop = () => {
+      rec.onstop = async () => {
+        if (id !== session.current) return; // sessão antiga (cancel() já limpou)
         cleanup();
         if (cancelled.current) return;
         const b = new Blob(chunks.current, { type: rec.mimeType || "audio/webm" });
+        // Espera (até 1,5s) o resultado final da transcrição do navegador.
+        await Promise.race([recognitionEnded.current, new Promise((r) => setTimeout(r, 1500))]);
+        if (id !== session.current || cancelled.current) return;
         setBlob(b);
         setUrl(URL.createObjectURL(b));
         setState("recorded");
@@ -128,16 +142,21 @@ export function useAudioRecorder() {
           setLiveTranscript(`${finalText.current}${interim}`.trim());
         };
         r.onerror = () => undefined;
+        recognitionEnded.current = new Promise<void>((resolve) => {
+          (r as unknown as { onend: (() => void) | null }).onend = () => resolve();
+        });
         try {
           r.start();
           recognition.current = r;
         } catch {
           recognition.current = null;
+          recognitionEnded.current = Promise.resolve();
         }
       }
       startTimer();
       setState("recording");
     } catch {
+      if (id !== session.current) return; // o usuário cancelou o pedido de permissão
       cleanup();
       setState("error");
       setError("Não conseguimos acessar o microfone. Verifique a permissão do navegador.");
@@ -163,6 +182,7 @@ export function useAudioRecorder() {
   }, []);
 
   const cancel = useCallback(() => {
+    session.current++;
     cancelled.current = true;
     if (recorder.current && recorder.current.state !== "inactive") recorder.current.stop();
     cleanup();

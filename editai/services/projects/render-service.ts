@@ -141,7 +141,11 @@ export async function getRenderForUser(userId: string, renderId: string) {
   const render = data as Render | null;
   if (!render) throw Errors.notFound("Renderização");
   const signed_url = render.output_url ? await getStorage().createSignedUrl(render.output_url, 3600) : null;
-  return { ...render, signed_url };
+  const ratio = (render.options?.aspectRatio ?? "").replace(":", "x");
+  const download_url = render.output_url
+    ? await getStorage().createSignedUrl(render.output_url, 3600, { download: `editai${ratio ? `-${ratio}` : ""}-${render.id.slice(0, 8)}.mp4` })
+    : null;
+  return { ...render, signed_url, download_url };
 }
 
 export async function estimateCommandCost(userId: string, projectId: string, plan: EditingPlan, options: RenderOptions, kind: RenderKind) {

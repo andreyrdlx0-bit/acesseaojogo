@@ -6,7 +6,7 @@ import { api } from "@/api/client";
 import { VideoUploader } from "@/components/project/video-uploader";
 import type { Project } from "@/types/domain";
 
-export function NewProjectFlow({ maxMb }: { maxMb: number }) {
+export function NewProjectFlow({ maxMb, maxMinutes }: { maxMb: number; maxMinutes: number }) {
   const router = useRouter();
   const created = useRef<string | null>(null);
 
@@ -21,6 +21,7 @@ export function NewProjectFlow({ maxMb }: { maxMb: number }) {
   return (
     <VideoUploader
       maxMb={maxMb}
+      maxMinutes={maxMinutes}
       ensureProject={ensureProject}
       onUploaded={(id) => setTimeout(() => router.push(`/projects/${id}`), 900)}
     />

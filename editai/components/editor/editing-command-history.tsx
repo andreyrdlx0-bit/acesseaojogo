@@ -36,7 +36,7 @@ export function EditingCommandHistory({ commands, versions }: { commands: Editin
               </span>
               <div className="text-sm">
                 <p>{c.assistant_reply}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground" suppressHydrationWarning>
                   {RESULT[c.status]}
                   {version && c.status === "rendered" && ` (Versão ${version.version_number})`} · {formatRelative(c.created_at)}
                 </p>
