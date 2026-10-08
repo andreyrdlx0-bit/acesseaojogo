@@ -65,6 +65,13 @@ export class FfmpegVideoProcessor implements VideoProcessor {
     }
 
     const args = buildFfmpegArgs(input, ctx.graph, metadata.hasAudio, timeline.outputDuration, ctx.fps, input.limits?.maxOutputBytes);
+    const hasOutputAudio = metadata.hasAudio || Boolean(ctx.graph.music);
+    if (!rateBudget(timeline.outputDuration, input.limits?.maxOutputBytes, hasOutputAudio).fits) {
+      throw new PermanentJobError(
+        `Saída de ${Math.round(timeline.outputDuration)}s não cabe no limite de armazenamento`,
+        "O vídeo final ficaria longo demais para o limite de armazenamento. Faça uma versão mais curta.",
+      );
+    }
     report(25, "render");
     const timeoutMs = input.limits?.timeoutMs ?? Math.max(5 * 60_000, timeline.outputDuration * 20_000);
     try {
@@ -74,7 +81,7 @@ export class FfmpegVideoProcessor implements VideoProcessor {
         timeoutMs,
       });
     } catch (error) {
-      if (error instanceof FfmpegError && error.exitCode === null && !error.notFound) {
+      if (error instanceof FfmpegError && error.timedOut) {
         // Estourou o tempo: tentar de novo daria o mesmo resultado.
         throw new PermanentJobError(
           `Renderização excedeu ${Math.round(timeoutMs / 1000)}s`,
@@ -139,7 +146,8 @@ export function buildFfmpegArgs(
   const args = ["-i", input.sourcePath];
   for (const extra of graph.extraInputs) args.push(...extra);
   args.push("-filter_complex", parts.join(";"), "-map", "[vout]");
-  if (audioLabel) args.push("-map", "[aout]", "-c:a", "aac", "-b:a", "160k", "-ar", "48000");
+  const budget = rateBudget(outputDuration, maxOutputBytes, Boolean(audioLabel));
+  if (audioLabel) args.push("-map", "[aout]", "-c:a", "aac", "-b:a", `${budget.audioKbps}k`, "-ar", "48000");
   else args.push("-an");
   args.push(
     "-t",
@@ -151,7 +159,7 @@ export function buildFfmpegArgs(
     "-crf",
     "21",
     // Teto de bitrate: mantém o arquivo final dentro do limite do storage.
-    ...bitrateCap(outputDuration, maxOutputBytes, Boolean(audioLabel)),
+    ...(budget.videoKbps ? ["-maxrate", `${budget.videoKbps}k`, "-bufsize", `${budget.videoKbps * 2}k`] : []),
     "-pix_fmt",
     "yuv420p",
     "-r",
@@ -163,11 +171,16 @@ export function buildFfmpegArgs(
   return args;
 }
 
-function bitrateCap(outputDuration: number, maxOutputBytes: number | undefined, hasAudio: boolean): string[] {
-  if (!maxOutputBytes || outputDuration <= 0) return [];
-  const budgetKbits = (maxOutputBytes * 0.9 * 8) / 1000;
-  const videoKbps = Math.max(250, Math.floor(budgetKbits / outputDuration) - (hasAudio ? 160 : 0));
-  return ["-maxrate", `${videoKbps}k`, "-bufsize", `${videoKbps * 2}k`];
+/**
+ * Orçamento de bitrate para a saída caber em `maxOutputBytes` (storage).
+ * Reduz também o áudio em saídas longas; `fits=false` quando nem o mínimo cabe.
+ */
+export function rateBudget(outputDuration: number, maxOutputBytes: number | undefined, hasAudio: boolean) {
+  if (!maxOutputBytes || outputDuration <= 0) return { audioKbps: hasAudio ? 160 : 0, videoKbps: undefined as number | undefined, fits: true };
+  const totalKbps = (maxOutputBytes * 0.9 * 8) / 1000 / outputDuration;
+  const audioKbps = !hasAudio ? 0 : totalKbps >= 450 ? 160 : totalKbps >= 300 ? 96 : 64;
+  const videoKbps = Math.floor(totalKbps - audioKbps);
+  return { audioKbps, videoKbps: Math.min(videoKbps, 20_000), fits: videoKbps >= 100 };
 }
 
 function chain(filters: string[], fallback: string): string {

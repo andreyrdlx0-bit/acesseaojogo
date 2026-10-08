@@ -30,7 +30,11 @@ export class VideoAnalysisService {
     const project = data as Project | null;
     if (!project?.original_video_url) throw new PermanentJobError("Projeto sem vídeo", "Envie um vídeo para este projeto.");
     const { data: existing } = await db.from("video_metadata").select("analysis_status").eq("project_id", projectId).maybeSingle();
-    if (existing?.analysis_status === "completed") return; // já analisado (job repetido)
+    if (existing?.analysis_status === "completed") {
+      // Job repetido: refaz só o passo final, caso a execução anterior tenha morrido antes dele.
+      await this.markReady(projectId, project.user_id);
+      return;
+    }
 
     const workDir = path.resolve(this.tmpRoot, `analyze-${projectId}`);
     await mkdir(workDir, { recursive: true });
@@ -104,8 +108,16 @@ export class VideoAnalysisService {
 
   async fail(projectId: string, error: unknown) {
     const db = createSupabaseAdminClient();
+    const { data: vm, error: readError } = await db.from("video_metadata").select("analysis_status").eq("project_id", projectId).maybeSingle();
+    if (readError) throw new Error(readError.message);
+    const { data: proj } = await db.from("projects").select("user_id").eq("id", projectId).maybeSingle();
+    if (vm?.analysis_status === "completed" && proj) {
+      // A análise terminou (a execução só morreu antes de encerrar o job): não marca falha.
+      await this.markReady(projectId, proj.user_id as string);
+      return;
+    }
     logger.error("failure", "Análise falhou", { projectId, error });
-    await db
+    const { error: metaError } = await db
       .from("video_metadata")
       .update({
         analysis_status: "failed",
@@ -114,6 +126,19 @@ export class VideoAnalysisService {
           : "Não conseguimos processar esse vídeo. Verifique o formato ou tente novamente.",
       })
       .eq("project_id", projectId);
-    await db.from("projects").update({ status: "failed" }).eq("id", projectId);
+    if (metaError) throw new Error(metaError.message);
+    const { error: projectError } = await db.from("projects").update({ status: "failed" }).eq("id", projectId);
+    if (projectError) throw new Error(projectError.message);
   }
+
+  /** Passo final idempotente da análise: projeto pronto e com thumbnail. */
+  private async markReady(projectId: string, userId: string) {
+    const { error } = await createSupabaseAdminClient()
+      .from("projects")
+      .update({ status: "ready", thumbnail_url: storagePaths.thumbnail(userId, projectId) })
+      .eq("id", projectId)
+      .eq("status", "analyzing");
+    if (error) throw new Error(error.message);
+  }
+
 }

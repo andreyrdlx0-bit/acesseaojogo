@@ -1,8 +1,19 @@
+"use client";
+
 import { Coins } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function CreditBalance({ balance, className }: { balance: number; className?: string }) {
+/** Saldo no cabeçalho. Atualiza ao vivo pelo evento "editai:balance" (editor/exportação). */
+export function CreditBalance({ balance: initial, className }: { balance: number; className?: string }) {
+  const [balance, setBalance] = useState(initial);
+  useEffect(() => setBalance(initial), [initial]);
+  useEffect(() => {
+    const onBalance = (e: Event) => setBalance((e as CustomEvent<number>).detail);
+    window.addEventListener("editai:balance", onBalance);
+    return () => window.removeEventListener("editai:balance", onBalance);
+  }, []);
   return (
     <Link
       href="/billing"

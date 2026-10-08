@@ -35,8 +35,13 @@ export class VideoProcessingService {
     const { data: renderRow } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
     const render = renderRow as Render | null;
     if (!render) throw new PermanentJobError(`Render ${renderId} não encontrado`, VIDEO_FAILURE_MESSAGE);
-    // Concluído, ou já marcado como falho e reembolsado: nunca renderiza de novo.
-    if (render.status === "completed" || render.status === "failed") return;
+    if (render.status === "completed") return;
+    if (render.status === "failed") {
+      // Uma finalização anterior marcou a falha mas pode ter falhado no reembolso:
+      // refaz só o reembolso (idempotente) e nunca renderiza de novo.
+      await creditService.refundRender(render.user_id, render.credits_charged, render.id);
+      return;
+    }
 
     const [{ data: projectRow }, { data: versionRow }, { data: metaRow }] = await Promise.all([
       db.from("projects").select("*").eq("id", render.project_id).single(),
@@ -151,7 +156,8 @@ export class VideoProcessingService {
   /** Marca falha definitiva: status, mensagem amigável e reembolso (idempotente). */
   async failRender(renderId: string, internalError: unknown): Promise<void> {
     const db = createSupabaseAdminClient();
-    const { data } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
+    const { data, error: readError } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
+    if (readError) throw new Error(readError.message);
     const render = data as Render | null;
     if (!render || render.status === "completed") return;
     logger.error("failure", "Render falhou", { renderId, error: internalError });
@@ -164,9 +170,15 @@ export class VideoProcessingService {
       if (error) throw new Error(error.message);
     }
     if (render.kind === "edit") {
-      await db.from("project_versions").update({ status: "failed" }).eq("id", render.version_id).neq("status", "ready");
-      await db.from("projects").update({ status: "ready" }).eq("id", render.project_id).eq("status", "processing");
-      if (render.command_id) await db.from("editing_commands").update({ status: "failed" }).eq("id", render.command_id);
+      // Erros do Supabase vêm em `error` (não lançam): checa cada passo para que
+      // o executor recoloque a finalização na fila se algo falhar.
+      const steps = [
+        await db.from("project_versions").update({ status: "failed" }).eq("id", render.version_id).neq("status", "ready"),
+        await db.from("projects").update({ status: "ready" }).eq("id", render.project_id).eq("status", "processing"),
+        render.command_id ? await db.from("editing_commands").update({ status: "failed" }).eq("id", render.command_id) : { error: null },
+      ];
+      const failed = steps.find((step) => step.error);
+      if (failed?.error) throw new Error(failed.error.message);
     }
     // Idempotente: (reference_id, reason) é único em credit_transactions.
     await creditService.refundRender(render.user_id, render.credits_charged, render.id);

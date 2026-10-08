@@ -56,7 +56,7 @@ export function ExportModal({
       const { render: r } = await api.get<{ render: RenderWithUrl }>(`/api/renders/${render.id}`);
       setRender(r);
       // Pendente (inclusive "processing" de uma tentativa interrompida): continua disparando.
-      if ((r.status === "queued" || r.status === "processing") && (r.status === "queued" || Date.now() - lastKick.current > 15_000)) {
+      if ((r.status === "queued" || r.status === "processing") && Date.now() - lastKick.current > (r.status === "queued" ? 5_000 : 15_000)) {
         lastKick.current = Date.now();
         void kickJobs();
       }

@@ -54,18 +54,25 @@ export function EditorWorkspace({
   const lastEditRender = renders.find((r) => r.kind === "edit");
   const analyzing = project.status === "analyzing" || metadata?.analysis_status === "pending" || metadata?.analysis_status === "processing";
 
-  const refresh = useCallback(async () => {
+  // Quando as URLs assinadas (válidas por 1h) foram geradas pela última vez.
+  const signedAtRef = useRef(Date.now());
+
+  const refresh = useCallback(async (opts: { renewUrls?: boolean } = {}) => {
     try {
       const [next, credits] = await Promise.all([
         api.get<ProjectDetail>(`/api/projects/${project.id}`),
         api.get<{ balance: number }>("/api/credits"),
       ]);
+      const renew = opts.renewUrls || Date.now() - signedAtRef.current > 45 * 60_000;
+      if (renew) signedAtRef.current = Date.now();
       setDetail((prev) => {
         // Quando um render termina, a nova versão vira a selecionada.
         if (next.project.current_version_id !== prev.project.current_version_id) setSelectedVersionId(next.project.current_version_id);
-        return keepSignedUrls(prev, next);
+        return renew ? next : keepSignedUrls(prev, next);
       });
       setBalance(credits.balance);
+      // Atualiza o saldo do cabeçalho sem recarregar a página.
+      window.dispatchEvent(new CustomEvent("editai:balance", { detail: credits.balance }));
       setLoadError(null);
     } catch {
       setLoadError("Não foi possível atualizar o projeto.");
@@ -75,12 +82,20 @@ export function EditorWorkspace({
   // Qualquer render pendente (edição ou exportação) mantém o processamento vivo.
   const hasPendingWork = renders.some((r) => r.status === "queued" || r.status === "processing") || analyzing;
 
-  // Saldo do cabeçalho (layout) acompanha cobranças e reembolsos.
+  // Ao terminar (ou falhar) um render, busca de novo: pega reembolsos no saldo.
   const hadActiveRender = useRef(Boolean(activeRender));
   useEffect(() => {
-    if (hadActiveRender.current && !activeRender) router.refresh();
+    if (hadActiveRender.current && !activeRender) void refresh();
     hadActiveRender.current = Boolean(activeRender);
-  }, [activeRender, router]);
+  }, [activeRender, refresh]);
+
+  // Renova as URLs assinadas antes de expirarem, mesmo sem polling ativo.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (Date.now() - signedAtRef.current > 45 * 60_000) void refresh({ renewUrls: true });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [refresh]);
   const lastKick = useRef(0);
   const kick = useCallback(() => {
     lastKick.current = Date.now();
@@ -123,7 +138,6 @@ export function EditorWorkspace({
     setPendingCommand(null);
     setDetail((d) => ({ ...d, renders: [{ ...render, signed_url: null }, ...d.renders], project: { ...d.project, status: "processing" } }));
     void refresh();
-    router.refresh();
   }
 
   async function deleteProject() {
@@ -148,14 +162,11 @@ export function EditorWorkspace({
           sourceDuration={metadata?.metadata?.duration ?? 0}
           maxQuality={maxQuality}
           balance={balance}
-          onCreditsChanged={() => {
-            void refresh();
-            router.refresh();
-          }}
+          onCreditsChanged={() => void refresh()}
         />
       </div>
 
-      {loadError && <ErrorState message={loadError} onRetry={refresh} />}
+      {loadError && <ErrorState message={loadError} onRetry={() => void refresh()} />}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -228,7 +239,7 @@ export function EditorWorkspace({
                 maxMb={maxMb}
                 maxMinutes={maxMinutes}
                 ensureProject={async () => project.id}
-                onUploaded={() => void refresh()}
+                onUploaded={() => void refresh({ renewUrls: true })}
               />
             </section>
           ) : analyzing ? (
@@ -282,14 +293,9 @@ export function EditorWorkspace({
 /**
  * Mantém as URLs assinadas já carregadas enquanto o arquivo não muda: evita que
  * o player reinicie a cada atualização (cada URL nova recarrega o vídeo).
- * As URLs valem 1h; após ~50min usamos as novas.
+ * A renovação antes de expirar é decidida em `refresh`.
  */
-const signedAt = { current: Date.now() };
 function keepSignedUrls(prev: ProjectDetail, next: ProjectDetail): ProjectDetail {
-  if (Date.now() - signedAt.current > 50 * 60_000) {
-    signedAt.current = Date.now();
-    return next;
-  }
   const byPath = new Map(prev.versions.map((v) => [v.video_url, v.signed_url]));
   const renderByPath = new Map(prev.renders.map((r) => [r.output_url, r.signed_url]));
   return {

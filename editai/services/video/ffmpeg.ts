@@ -32,6 +32,8 @@ export class FfmpegError extends Error {
     readonly stderrTail: string,
     /** O binário não existe neste ambiente (ENOENT). */
     readonly notFound = false,
+    /** Interrompido pelo limite de tempo de runProcess (não por OOM/sinal externo). */
+    readonly timedOut = false,
   ) {
     super(message);
     this.name = "FfmpegError";
@@ -85,7 +87,7 @@ function runProcess(bin: string, args: string[], options: RunOptions): Promise<{
     const timeout = options.timeoutMs
       ? setTimeout(() => {
           child.kill("SIGKILL");
-          finish(() => reject(new FfmpegError("Tempo limite de processamento excedido", null, stderr.slice(-2000))));
+          finish(() => reject(new FfmpegError("Tempo limite de processamento excedido", null, stderr.slice(-2000), false, true)));
         }, options.timeoutMs)
       : null;
     const abort = () => child.kill("SIGKILL");
@@ -115,9 +117,11 @@ function runProcess(bin: string, args: string[], options: RunOptions): Promise<{
     child.on("error", (err: NodeJS.ErrnoException) => {
       finish(() => reject(new FfmpegError(`Não foi possível executar ${bin}: ${err.message}`, null, "", err.code === "ENOENT" || err.code === "EACCES")));
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       finish(() =>
-        code === 0 ? resolve({ stdout, stderr }) : reject(new FfmpegError(`${bin} terminou com código ${code}`, code, stderr.slice(-8000))),
+        code === 0
+          ? resolve({ stdout, stderr })
+          : reject(new FfmpegError(`${bin} terminou com código ${code}${signal ? ` (sinal ${signal})` : ""}`, code, stderr.slice(-8000))),
       );
     });
   });

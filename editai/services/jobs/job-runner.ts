@@ -65,8 +65,9 @@ export async function runNextJob(input: {
     });
     if (!retry) {
       try {
-        // Marca falha + reembolso ANTES de encerrar o job: se isso falhar, o job
-        // volta para a fila e a próxima tentativa só refaz esta finalização.
+        // Marca falha + reembolso ANTES de encerrar o job. Se isso falhar, o job
+        // volta para a fila; na próxima execução o render já "failed" refaz só o
+        // reembolso, e uma análise já concluída não é marcada como falha.
         if (job.type === "analyze") await new VideoAnalysisService().fail(String(job.payload.projectId), error);
         else await new VideoProcessingService().failRender(String(job.payload.renderId), error);
       } catch (finalizeError) {

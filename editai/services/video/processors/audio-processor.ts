@@ -22,7 +22,9 @@ export const AudioProcessor: OperationProcessor = {
       if (enhance.preset === "podcast") a.push("equalizer=f=180:t=q:w=1:g=2", "equalizer=f=3500:t=q:w=1.2:g=3");
       else a.push("equalizer=f=3000:t=q:w=1.5:g=2");
       a.push("acompressor=threshold=-20dB:ratio=3:attack=5:release=120:makeup=2");
-      a.push(`loudnorm=I=${enhance.preset === "loud" ? -13 : -16}:TP=-1.5:LRA=11`, "aresample=48000");
+      // O flush do loudnorm deixa um buraco no PTS perto do fim: reconstrói o tempo
+      // pela contagem de amostras (a cadeia começa em 0 e é contínua).
+      a.push(`loudnorm=I=${enhance.preset === "loud" ? -13 : -16}:TP=-1.5:LRA=11`, "aresample=48000", "asetpts=N/SR/TB");
     }
     if (volume && volume.gainDb !== 0) a.push(`volume=${volume.gainDb}dB`, "alimiter=limit=0.97");
   },
