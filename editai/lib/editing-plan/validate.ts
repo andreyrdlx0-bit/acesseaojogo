@@ -98,8 +98,9 @@ export function normalizeEditingPlan(plan: EditingPlan): EditingPlan {
     let merged: OperationOf<"subtitles"> = current ?? editingSubtitlesDefaults();
     for (const update of styleUpdates) {
       if (!update.enabled) continue;
-      const { type: _t, enabled: _e, ...patch } = update;
-      const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+      const defined = Object.fromEntries(
+        Object.entries(update).filter(([k, v]) => v !== undefined && k !== "type" && k !== "enabled"),
+      );
       merged = { ...merged, ...defined, enabled: true };
     }
     singles.set("subtitles", merged);
