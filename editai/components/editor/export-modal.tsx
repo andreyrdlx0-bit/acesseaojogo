@@ -2,7 +2,7 @@
 
 import { Download, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { type MouseEvent, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { kickJobs } from "@/api/job-runner";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ export function ExportModal({
   onCreditsChanged?: () => void;
 }) {
   const lastKick = useRef(0);
+  // Quando as URLs do render (assinadas por 1h) foram buscadas.
+  const fetchedAt = useRef(0);
   const [open, setOpen] = useState(false);
   const [ratio, setRatio] = useState<AspectRatio>("9:16");
   const [quality, setQuality] = useState<ExportQuality>(maxQuality);
@@ -54,6 +56,7 @@ export function ExportModal({
     async () => {
       if (!render) return;
       const { render: r } = await api.get<{ render: RenderWithUrl }>(`/api/renders/${render.id}`);
+      fetchedAt.current = Date.now();
       setRender(r);
       // Pendente (inclusive "processing" de uma tentativa interrompida): continua disparando.
       if ((r.status === "queued" || r.status === "processing") && Date.now() - lastKick.current > (r.status === "queued" ? 5_000 : 15_000)) {
@@ -65,6 +68,21 @@ export function ExportModal({
     1500,
     Boolean(running),
   );
+
+  /** Com o modal aberto há muito tempo, a URL de download já expirou: busca outra antes. */
+  async function download(e: MouseEvent<HTMLAnchorElement>) {
+    if (!render || Date.now() - fetchedAt.current < 45 * 60_000) return;
+    e.preventDefault();
+    try {
+      const { render: r } = await api.get<{ render: RenderWithUrl }>(`/api/renders/${render.id}`);
+      fetchedAt.current = Date.now();
+      setRender(r);
+      const url = r.download_url ?? r.signed_url;
+      if (url) window.location.assign(url);
+    } catch {
+      setError({ message: "Não foi possível gerar o link de download. Tente de novo." });
+    }
+  }
 
   async function start() {
     if (!version) return;
@@ -169,10 +187,11 @@ export function ExportModal({
                   <Stat label="Tamanho" value={formatBytes(render.output_size_bytes)} />
                 </dl>
                 <Button asChild variant="accent" size="lg">
-                  <a href={render.download_url ?? render.signed_url} rel="noopener">
+                  <a href={render.download_url ?? render.signed_url} rel="noopener" onClick={download}>
                     <Download /> Baixar vídeo
                   </a>
                 </Button>
+                {error && <p className="text-sm text-red-400">{error.message}</p>}
               </>
             )}
           </div>

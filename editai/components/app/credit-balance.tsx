@@ -5,10 +5,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Saldo no cabeçalho. Atualiza ao vivo pelo evento "editai:balance" (editor/exportação). */
-export function CreditBalance({ balance: initial, className }: { balance: number; className?: string }) {
+/**
+ * Saldo no cabeçalho. Atualiza ao vivo pelo evento "editai:balance" (editor/exportação).
+ * `renderedAt` muda a cada renderização no servidor: o valor do servidor volta a
+ * valer mesmo quando é igual ao anterior (ex.: reembolso devolveu o saldo inicial).
+ */
+export function CreditBalance({ balance: initial, renderedAt, className }: { balance: number; renderedAt?: number; className?: string }) {
   const [balance, setBalance] = useState(initial);
-  useEffect(() => setBalance(initial), [initial]);
+  useEffect(() => setBalance(initial), [initial, renderedAt]);
   useEffect(() => {
     const onBalance = (e: Event) => setBalance((e as CustomEvent<number>).detail);
     window.addEventListener("editai:balance", onBalance);

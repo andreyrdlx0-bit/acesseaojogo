@@ -1,5 +1,6 @@
 import { Coins, Film, FolderOpen, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { RefreshOnHistoryNavigation } from "@/components/app/refresh-on-history-navigation";
 import { EmptyState } from "@/components/app/states";
 import { ProjectGrid } from "@/components/project/project-card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-5 py-8 lg:px-8">
+      <RefreshOnHistoryNavigation />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Olá{firstName ? `, ${firstName}` : ""}.</p>

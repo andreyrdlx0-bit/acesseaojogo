@@ -55,7 +55,9 @@ export function EditorWorkspace({
   const analyzing = project.status === "analyzing" || metadata?.analysis_status === "pending" || metadata?.analysis_status === "processing";
 
   // Quando as URLs assinadas (válidas por 1h) foram geradas pela última vez.
-  const signedAtRef = useRef(Date.now());
+  // Vem do servidor: voltar/avançar no navegador remonta o editor com dados em
+  // cache, então "agora" não serve. min() protege contra relógio local atrasado.
+  const signedAtRef = useRef(Math.min(Date.now(), initial.signedAt ?? Date.now()));
 
   const refresh = useCallback(async (opts: { renewUrls?: boolean } = {}) => {
     try {
@@ -80,21 +82,43 @@ export function EditorWorkspace({
   }, [project.id]);
 
   // Qualquer render pendente (edição ou exportação) mantém o processamento vivo.
-  const hasPendingWork = renders.some((r) => r.status === "queued" || r.status === "processing") || analyzing;
+  // Projeto ainda "processing" sem render ativo = finalização recolocada na fila.
+  const hasPendingWork =
+    renders.some((r) => r.status === "queued" || r.status === "processing") || analyzing || project.status === "processing";
+
+  // Busca agora e de novo em alguns segundos: o reembolso de uma falha é gravado
+  // logo depois do status, e a primeira busca pode chegar antes dele. O segundo
+  // disparo não é cancelado ao sair da página: ainda atualiza o saldo do cabeçalho.
+  const refreshTwice = useCallback(() => {
+    void refresh();
+    setTimeout(() => void refresh(), 3000);
+  }, [refresh]);
 
   // Ao terminar (ou falhar) um render, busca de novo: pega reembolsos no saldo.
   const hadActiveRender = useRef(Boolean(activeRender));
   useEffect(() => {
-    if (hadActiveRender.current && !activeRender) void refresh();
+    if (hadActiveRender.current && !activeRender) refreshTwice();
     hadActiveRender.current = Boolean(activeRender);
-  }, [activeRender, refresh]);
+  }, [activeRender, refreshTwice]);
 
-  // Renova as URLs assinadas antes de expirarem, mesmo sem polling ativo.
+  // Ao montar, os dados podem ter vindo do cache do navegador (voltar/avançar):
+  // busca o estado atual. Depois renova as URLs assinadas antes de expirarem,
+  // mesmo sem polling e também ao voltar para a aba (o intervalo dorme junto).
   useEffect(() => {
-    const id = setInterval(() => {
+    const renewIfOld = () => {
       if (Date.now() - signedAtRef.current > 45 * 60_000) void refresh({ renewUrls: true });
-    }, 60_000);
-    return () => clearInterval(id);
+    };
+    if (Date.now() - signedAtRef.current > 45 * 60_000) renewIfOld();
+    else void refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") renewIfOld();
+    };
+    const id = setInterval(renewIfOld, 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
   const lastKick = useRef(0);
   const kick = useCallback(() => {
@@ -162,7 +186,7 @@ export function EditorWorkspace({
           sourceDuration={metadata?.metadata?.duration ?? 0}
           maxQuality={maxQuality}
           balance={balance}
-          onCreditsChanged={() => void refresh()}
+          onCreditsChanged={refreshTwice}
         />
       </div>
 
@@ -300,6 +324,7 @@ function keepSignedUrls(prev: ProjectDetail, next: ProjectDetail): ProjectDetail
   const renderByPath = new Map(prev.renders.map((r) => [r.output_url, r.signed_url]));
   return {
     ...next,
+    signedAt: prev.signedAt,
     versions: next.versions.map((v) => {
       const old = v.video_url ? byPath.get(v.video_url) : null;
       return old ? { ...v, signed_url: old } : v;

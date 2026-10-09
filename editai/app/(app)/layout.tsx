@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-dvh">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col pb-20 lg:pb-0">
-        <Header email={user.email ?? ""} name={profile?.full_name ?? null} balance={credits?.balance ?? 0} />
+        <Header email={user.email ?? ""} name={profile?.full_name ?? null} balance={credits?.balance ?? 0} renderedAt={Date.now()} />
         <main className="flex-1">{children}</main>
       </div>
       <MobileNav />

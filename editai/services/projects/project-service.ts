@@ -26,6 +26,8 @@ export interface ProjectSummary extends Project {
 }
 
 export interface ProjectDetail {
+  /** Quando as URLs assinadas (TTL de 1h) foram geradas (relógio do servidor, ms). */
+  signedAt: number;
   project: Project;
   metadata: VideoMetadataRow | null;
   versions: (ProjectVersion & { signed_url: string | null })[];
@@ -98,10 +100,12 @@ export async function getProjectDetail(userId: string, projectId: string): Promi
     ...versionRows.map((v) => v.video_url),
     ...renderRows.map((r) => r.output_url),
   ].filter((p): p is string => Boolean(p));
+  const signedAt = Date.now();
   const signed = await getStorage().createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
   const sign = (p: string | null) => (p ? (signed[p] ?? null) : null);
 
   return {
+    signedAt,
     project,
     metadata: (meta.data as VideoMetadataRow | null) ?? null,
     versions: versionRows.map((v) => ({ ...v, signed_url: sign(v.video_url) })),

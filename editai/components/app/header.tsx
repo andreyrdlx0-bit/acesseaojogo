@@ -5,7 +5,7 @@ import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { CreditBalance } from "./credit-balance";
 
-export function Header({ email, name, balance }: { email: string; name: string | null; balance: number }) {
+export function Header({ email, name, balance, renderedAt }: { email: string; name: string | null; balance: number; renderedAt?: number }) {
   const initials = (name || email).slice(0, 1).toUpperCase();
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/80 px-5 backdrop-blur lg:px-8">
@@ -14,7 +14,7 @@ export function Header({ email, name, balance }: { email: string; name: string |
       </Link>
       <div className="hidden lg:block" />
       <div className="flex items-center gap-3">
-        <CreditBalance balance={balance} />
+        <CreditBalance balance={balance} renderedAt={renderedAt} />
         <Link
           href="/settings"
           aria-label="Configurações da conta"

@@ -4,7 +4,8 @@ import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSpeechToText } from "@/services/ai/stt";
 import { getStorage } from "@/services/storage";
-import type { Project } from "@/types/domain";
+import type { Project, VideoMetadataRow } from "@/types/domain";
+import type { VideoMetadata } from "@/types/video";
 import type { VideoAnalyzer } from "@/types/services";
 import { storagePaths } from "@/utils/storage-paths";
 import { defaultTmpRoot } from "./fonts";
@@ -26,19 +27,22 @@ export class VideoAnalysisService {
   async run(projectId: string): Promise<void> {
     const db = createSupabaseAdminClient();
     const storage = getStorage();
-    const { data } = await db.from("projects").select("*").eq("id", projectId).maybeSingle();
+    // Erro de leitura é transitório: lança Error comum (nova tentativa), nunca falha permanente.
+    const { data, error: projectError } = await db.from("projects").select("*").eq("id", projectId).maybeSingle();
+    if (projectError) throw new Error(projectError.message);
     const project = data as Project | null;
     if (!project?.original_video_url) throw new PermanentJobError("Projeto sem vídeo", "Envie um vídeo para este projeto.");
-    const { data: existing } = await db.from("video_metadata").select("analysis_status").eq("project_id", projectId).maybeSingle();
+    const { data: existing, error: existingError } = await db.from("video_metadata").select("*").eq("project_id", projectId).maybeSingle();
+    if (existingError) throw new Error(existingError.message);
     if (existing?.analysis_status === "completed") {
-      // Job repetido: refaz só o passo final, caso a execução anterior tenha morrido antes dele.
-      await this.markReady(projectId, project.user_id);
+      // Job repetido: refaz só os passos finais, caso a execução anterior tenha morrido antes deles.
+      await this.finishCompleted(projectId, project.user_id, (existing as VideoMetadataRow).metadata);
       return;
     }
 
     const workDir = path.resolve(this.tmpRoot, `analyze-${projectId}`);
     await mkdir(workDir, { recursive: true });
-    await db.from("video_metadata").update({ analysis_status: "processing", analysis_error: null }).eq("project_id", projectId);
+    throwIfError(await db.from("video_metadata").update({ analysis_status: "processing", analysis_error: null }).eq("project_id", projectId));
     try {
       const source = path.join(workDir, `source${path.extname(project.original_video_url)}`);
       await storage.downloadToFile(project.original_video_url, source);
@@ -81,25 +85,24 @@ export class VideoAnalysisService {
         logger.warn("transcription", "Sem provedor de STT: vídeo sem transcrição (legendas indisponíveis)", { projectId });
       }
 
-      await db
-        .from("video_metadata")
-        .update({
-          analysis_status: "completed",
-          duration: metadata.duration,
-          width: metadata.width,
-          height: metadata.height,
-          fps: metadata.fps,
-          has_audio: metadata.hasAudio,
-          metadata,
-          analyzed_at: new Date().toISOString(),
-        })
-        .eq("project_id", projectId);
-      await db
-        .from("project_versions")
-        .update({ duration: metadata.duration, width: metadata.width, height: metadata.height, size_bytes: metadata.sizeBytes })
-        .eq("project_id", projectId)
-        .eq("version_number", 1);
-      await db.from("projects").update({ status: "ready", thumbnail_url: thumbKey }).eq("id", projectId);
+      // Erros do Supabase vêm em `error` (não lançam): sem checar, o projeto
+      // ficaria preso em "analyzing". Lançando, o job volta para a fila.
+      throwIfError(
+        await db
+          .from("video_metadata")
+          .update({
+            analysis_status: "completed",
+            duration: metadata.duration,
+            width: metadata.width,
+            height: metadata.height,
+            fps: metadata.fps,
+            has_audio: metadata.hasAudio,
+            metadata,
+            analyzed_at: new Date().toISOString(),
+          })
+          .eq("project_id", projectId),
+      );
+      await this.finishCompleted(projectId, project.user_id, metadata);
       logger.info("analysis", "Análise concluída", { projectId, duration: metadata.duration, silences: metadata.silences.length });
     } finally {
       await rm(workDir, { recursive: true, force: true });
@@ -108,12 +111,13 @@ export class VideoAnalysisService {
 
   async fail(projectId: string, error: unknown) {
     const db = createSupabaseAdminClient();
-    const { data: vm, error: readError } = await db.from("video_metadata").select("analysis_status").eq("project_id", projectId).maybeSingle();
+    const { data: vm, error: readError } = await db.from("video_metadata").select("*").eq("project_id", projectId).maybeSingle();
     if (readError) throw new Error(readError.message);
-    const { data: proj } = await db.from("projects").select("user_id").eq("id", projectId).maybeSingle();
-    if (vm?.analysis_status === "completed" && proj) {
+    if (vm?.analysis_status === "completed") {
       // A análise terminou (a execução só morreu antes de encerrar o job): não marca falha.
-      await this.markReady(projectId, proj.user_id as string);
+      const { data: proj, error: projReadError } = await db.from("projects").select("user_id").eq("id", projectId).maybeSingle();
+      if (projReadError) throw new Error(projReadError.message);
+      if (proj) await this.finishCompleted(projectId, proj.user_id as string, (vm as VideoMetadataRow).metadata);
       return;
     }
     logger.error("failure", "Análise falhou", { projectId, error });
@@ -131,14 +135,31 @@ export class VideoAnalysisService {
     if (projectError) throw new Error(projectError.message);
   }
 
-  /** Passo final idempotente da análise: projeto pronto e com thumbnail. */
-  private async markReady(projectId: string, userId: string) {
-    const { error } = await createSupabaseAdminClient()
-      .from("projects")
-      .update({ status: "ready", thumbnail_url: storagePaths.thumbnail(userId, projectId) })
-      .eq("id", projectId)
-      .eq("status", "analyzing");
-    if (error) throw new Error(error.message);
+  /**
+   * Passos finais idempotentes da análise: dados da versão 1 e projeto pronto
+   * com thumbnail. Só tira do "analyzing" (nunca regride outro status).
+   */
+  private async finishCompleted(projectId: string, userId: string, metadata: VideoMetadata | null) {
+    const db = createSupabaseAdminClient();
+    if (metadata) {
+      throwIfError(
+        await db
+          .from("project_versions")
+          .update({ duration: metadata.duration, width: metadata.width, height: metadata.height, size_bytes: metadata.sizeBytes })
+          .eq("project_id", projectId)
+          .eq("version_number", 1),
+      );
+    }
+    throwIfError(
+      await db
+        .from("projects")
+        .update({ status: "ready", thumbnail_url: storagePaths.thumbnail(userId, projectId) })
+        .eq("id", projectId)
+        .eq("status", "analyzing"),
+    );
   }
+}
 
+function throwIfError(result: { error: { message: string } | null }): void {
+  if (result.error) throw new Error(result.error.message);
 }

@@ -12,6 +12,8 @@ export interface RunResult {
 }
 
 const HEARTBEAT_MS = 60_000;
+/** Tentativas extras para FINALIZAR (marcar falha/reembolsar) quando o banco está instável. */
+const EXTRA_FINALIZE_ATTEMPTS = 5;
 
 /**
  * Executa UM job da fila: usado pelo worker dedicado (todos os usuários) e
@@ -66,14 +68,19 @@ export async function runNextJob(input: {
     if (!retry) {
       try {
         // Marca falha + reembolso ANTES de encerrar o job. Se isso falhar, o job
-        // volta para a fila; na próxima execução o render já "failed" refaz só o
-        // reembolso, e uma análise já concluída não é marcada como falha.
+        // volta para a fila; na próxima execução o render já "failed" refaz
+        // reembolso e limpeza, e uma análise já concluída só termina de marcar o
+        // projeto como pronto (o job em si fica registrado como falho).
         if (job.type === "analyze") await new VideoAnalysisService().fail(String(job.payload.projectId), error);
         else await new VideoProcessingService().failRender(String(job.payload.renderId), error);
       } catch (finalizeError) {
-        logger.error("worker", "Falha ao finalizar job com erro; ficará na fila", { jobId: job.id, error: finalizeError });
-        await queue.fail(job.id, workerId, message, true);
-        return { job: { id: job.id, type: job.type }, status: "retry" };
+        const giveUp = job.attempts > job.maxAttempts + EXTRA_FINALIZE_ATTEMPTS;
+        logger.error("worker", giveUp ? "Finalização abandonada após várias tentativas" : "Falha ao finalizar job com erro; ficará na fila", {
+          jobId: job.id,
+          error: finalizeError,
+        });
+        await queue.fail(job.id, workerId, message, !giveUp);
+        return { job: { id: job.id, type: job.type }, status: giveUp ? "failed" : "retry" };
       }
     }
     await queue.fail(job.id, workerId, message, retry);

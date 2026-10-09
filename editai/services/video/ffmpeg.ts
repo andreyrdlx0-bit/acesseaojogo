@@ -121,7 +121,13 @@ function runProcess(bin: string, args: string[], options: RunOptions): Promise<{
       finish(() =>
         code === 0
           ? resolve({ stdout, stderr })
-          : reject(new FfmpegError(`${bin} terminou com código ${code}${signal ? ` (sinal ${signal})` : ""}`, code, stderr.slice(-8000))),
+          : reject(
+              new FfmpegError(
+                code === null && signal ? `${bin} foi interrompido pelo sinal ${signal}` : `${bin} terminou com código ${code}`,
+                code,
+                stderr.slice(-8000),
+              ),
+            ),
       );
     });
   });

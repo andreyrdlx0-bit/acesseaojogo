@@ -1,5 +1,6 @@
 import { FolderOpen, Plus } from "lucide-react";
 import Link from "next/link";
+import { RefreshOnHistoryNavigation } from "@/components/app/refresh-on-history-navigation";
 import { EmptyState } from "@/components/app/states";
 import { ProjectGrid } from "@/components/project/project-card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export default async function ProjectsPage() {
   const projects = await listProjects(user.id, 100);
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-8 lg:px-8">
+      <RefreshOnHistoryNavigation />
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display text-4xl">Meus projetos</h1>
         <Button asChild variant="accent">
