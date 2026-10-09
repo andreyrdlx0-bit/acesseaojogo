@@ -78,10 +78,12 @@ export function EditorWorkspace({
         if (merged.project.current_version_id !== prev.project.current_version_id) setSelectedVersionId(merged.project.current_version_id);
         return renew ? merged : keepSignedUrls(prev, merged);
       });
-      // Comando que já foi confirmado (ex.: dados do cache ao voltar no navegador).
+      // Comando que já terminou (ex.: dados do cache ao voltar no navegador).
+      // Só status finais: "confirmed" pode ser passageiro durante a própria
+      // confirmação, que volta para "planned" se falhar.
       setPendingCommand((pending) => {
         const current = pending ? next.commands.find((c) => c.id === pending.id) : undefined;
-        return current && current.status !== "planned" ? null : pending;
+        return current && ["rendered", "failed", "discarded"].includes(current.status) ? null : pending;
       });
       setBalance(credits.balance);
       // Atualiza o saldo do cabeçalho sem recarregar a página.

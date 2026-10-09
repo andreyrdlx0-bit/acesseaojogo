@@ -1,11 +1,11 @@
 "use client";
 
 import { Coins, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { CREDIT_PACKS, PAID_PLANS, getPlan } from "@/config/plans";
-import { useLiveBalance } from "@/hooks/use-live-balance";
+import { BALANCE_EVENT, useLiveBalance } from "@/hooks/use-live-balance";
 import { cn } from "@/lib/utils";
 import type { CreditTransaction } from "@/types/domain";
 import { formatBRL, formatDate } from "@/utils/format";
@@ -31,11 +31,30 @@ export function BillingView({
   transactions: CreditTransaction[];
   paymentsEnabled: boolean;
 }) {
-  // A página pode vir do cache (voltar no navegador): o saldo busca o valor atual.
-  const liveBalance = useLiveBalance(balance, { fetchOnMount: true });
+  const liveBalance = useLiveBalance(balance);
+  const [history, setHistory] = useState(transactions);
+  const [livePlanId, setLivePlanId] = useState(planId);
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const current = getPlan(planId);
+  const current = getPlan(livePlanId);
+
+  // A página pode vir do cache (voltar no navegador): busca saldo, extrato e
+  // plano atuais juntos, para não mostrar saldo novo com extrato velho.
+  useEffect(() => {
+    let active = true;
+    api
+      .get<{ balance: number; transactions: CreditTransaction[]; subscription: { plan_id: string } | null }>("/api/credits")
+      .then((data) => {
+        if (!active) return;
+        setHistory(data.transactions.slice(0, 20));
+        setLivePlanId(data.subscription?.plan_id ?? "free");
+        window.dispatchEvent(new CustomEvent(BALANCE_EVENT, { detail: data.balance }));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function checkout(body: { planId: string } | { packId: string }, key: string) {
     setPending(key);
@@ -124,8 +143,8 @@ export function BillingView({
       <section>
         <h2 className="text-lg font-semibold">Extrato</h2>
         <div className="mt-4 divide-y divide-border rounded-2xl border border-border">
-          {transactions.length === 0 && <p className="px-5 py-6 text-sm text-muted-foreground">Nenhuma movimentação ainda.</p>}
-          {transactions.map((t) => (
+          {history.length === 0 && <p className="px-5 py-6 text-sm text-muted-foreground">Nenhuma movimentação ainda.</p>}
+          {history.map((t) => (
             <div key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
               <div>
                 <p>{t.description || REASON[t.reason]}</p>

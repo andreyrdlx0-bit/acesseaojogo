@@ -30,9 +30,19 @@ export async function hasOtherActiveEdit(projectId: string, renderId: string): P
   return (count ?? 0) > 0;
 }
 
-/** Edição já gravada como "completed": versão pronta, projeto e comando atualizados. */
+/**
+ * Edição já gravada como "completed": versão pronta, projeto e comando
+ * atualizados. O comando é o último passo e marca a finalização como feita:
+ * depois disso, repetir (nova tentativa atrasada) não troca de novo a versão
+ * atual, que o usuário pode já ter mudado.
+ */
 export async function finishCompletedEdit(render: Render): Promise<void> {
   const db = createSupabaseAdminClient();
+  if (render.command_id) {
+    const { data: command, error } = await db.from("editing_commands").select("status").eq("id", render.command_id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (command?.status === "rendered") return;
+  }
   throwIfError(
     await db
       .from("project_versions")
@@ -98,11 +108,10 @@ export async function reconcileProject(input: {
     const version = versionById.get(render.version_id);
     const command = render.command_id ? commandById.get(render.command_id) : undefined;
     const commandPending = command?.status === "confirmed";
-    if (render.status === "completed" && version?.status === "pending") {
+    // Versão ainda pendente ou comando ainda "confirmed" = finalização pela
+    // metade (o comando é o último passo): refaz tudo, inclusive a versão atual.
+    if (render.status === "completed" && (version?.status === "pending" || commandPending)) {
       await finishCompletedEdit(render);
-      changed = true;
-    } else if (render.status === "completed" && commandPending && command) {
-      throwIfError(await createSupabaseAdminClient().from("editing_commands").update({ status: "rendered" }).eq("id", command.id).eq("status", "confirmed"));
       changed = true;
     } else if (render.status === "failed" && (version?.status === "pending" || commandPending)) {
       await finishFailedRender(render);
@@ -110,8 +119,12 @@ export async function reconcileProject(input: {
     }
   }
 
-  // Reembolsos que ficaram para trás (o job desistiu de finalizar).
-  const charged = renders.filter((r) => r.status === "failed" && r.credits_charged > 0);
+  // Reembolsos que ficaram para trás (o job desistiu de finalizar, o que
+  // acontece em minutos): só falhas recentes, para não consultar a cada polling.
+  const recent = Date.now() - 24 * 3600_000;
+  const charged = renders.filter(
+    (r) => r.status === "failed" && r.credits_charged > 0 && (!r.completed_at || Date.parse(r.completed_at) > recent),
+  );
   if (charged.length) {
     const { data, error } = await createSupabaseAdminClient()
       .from("credit_transactions")

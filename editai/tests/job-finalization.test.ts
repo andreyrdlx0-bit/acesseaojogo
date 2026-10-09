@@ -207,7 +207,7 @@ function seedEditRender(extra: Row[] = []) {
   seedProject(
     [editRender("r1", "v2", "c1"), ...extra],
     [{ id: "v2", project_id: P, version_number: 2, status: "pending", editing_plan: { version: 1, operations: [] } }],
-    [{ id: "c1", status: "confirmed" }],
+    [{ id: "c1", project_id: P, status: "confirmed" }],
   );
   queue.enqueue("render", { renderId: "r1" });
 }
@@ -313,8 +313,8 @@ describe("render concluído", () => {
         { id: "v3", project_id: P, version_number: 3, status: "pending", editing_plan: { version: 1, operations: [] } },
       ],
       [
-        { id: "c1", status: "confirmed" },
-        { id: "c2", status: "confirmed" },
+        { id: "c1", project_id: P, status: "confirmed" },
+        { id: "c2", project_id: P, status: "confirmed" },
       ],
     );
     db.engine = "ok";
@@ -329,7 +329,7 @@ describe("render concluído", () => {
     seedProject(
       [editRender("r1", "v2", "c1")],
       [{ id: "v2", project_id: P, version_number: 2, status: "pending", editing_plan: { version: 1, operations: [] } }],
-      [{ id: "c1", status: "confirmed" }],
+      [{ id: "c1", project_id: P, status: "confirmed" }],
     );
     queue.enqueue("render", { renderId: "r1" }, 2);
     db.engine = "ok";
@@ -365,6 +365,36 @@ describe("render concluído", () => {
 });
 
 describe("autocorreção ao abrir o projeto", () => {
+  it("edição concluída com o passo do projeto pendente: abre já na versão nova", async () => {
+    seedEditRender();
+    db.engine = "ok";
+    db.updateErrors.projects = 1;
+    expect((await run()).status).toBe("retry");
+    expect(row("projects")).toMatchObject({ status: "processing", current_version_id: "v1" });
+
+    const detail = await getProjectDetail(U, P);
+    expect(detail.project).toMatchObject({ status: "ready", current_version_id: "v2" });
+    expect(row("editing_commands").status).toBe("rendered");
+
+    expect((await run()).status).toBe("completed");
+    expect(row("projects").current_version_id).toBe("v2");
+    expect(db.renders).toBe(1);
+  });
+
+  it("nova tentativa atrasada não desfaz a versão que o usuário escolheu depois", async () => {
+    seedEditRender();
+    db.engine = "ok";
+    db.updateErrors.project_versions = 1;
+    expect((await run()).status).toBe("retry");
+    await getProjectDetail(U, P);
+    expect(row("projects").current_version_id).toBe("v2");
+
+    // O usuário volta para o vídeo original.
+    Object.assign(row("projects"), { current_version_id: "v1" });
+    expect((await run()).status).toBe("completed");
+    expect(row("projects").current_version_id).toBe("v1");
+  });
+
   it("destrava projeto 'processing' sem nenhuma edição ativa", async () => {
     seedProject([]);
     const detail = await getProjectDetail(U, P);
@@ -375,7 +405,7 @@ describe("autocorreção ao abrir o projeto", () => {
     seedProject(
       [{ ...editRender("r1", "v2", "c1", "completed"), output_url: "x.mp4", output_duration: 8, output_width: 720, output_height: 1280, output_size_bytes: 1 }],
       [{ id: "v2", project_id: P, version_number: 2, status: "pending", editing_plan: { version: 1, operations: [] } }],
-      [{ id: "c1", status: "confirmed" }],
+      [{ id: "c1", project_id: P, status: "confirmed" }],
     );
     const detail = await getProjectDetail(U, P);
     expect(detail.project).toMatchObject({ status: "ready", current_version_id: "v2" });
