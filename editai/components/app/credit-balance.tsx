@@ -2,22 +2,12 @@
 
 import { Coins } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useLiveBalance } from "@/hooks/use-live-balance";
 import { cn } from "@/lib/utils";
 
-/**
- * Saldo no cabeçalho. Atualiza ao vivo pelo evento "editai:balance" (editor/exportação).
- * `renderedAt` muda a cada renderização no servidor: o valor do servidor volta a
- * valer mesmo quando é igual ao anterior (ex.: reembolso devolveu o saldo inicial).
- */
+/** Saldo no cabeçalho. Atualiza ao vivo pelo evento "editai:balance" (editor/exportação). */
 export function CreditBalance({ balance: initial, renderedAt, className }: { balance: number; renderedAt?: number; className?: string }) {
-  const [balance, setBalance] = useState(initial);
-  useEffect(() => setBalance(initial), [initial, renderedAt]);
-  useEffect(() => {
-    const onBalance = (e: Event) => setBalance((e as CustomEvent<number>).detail);
-    window.addEventListener("editai:balance", onBalance);
-    return () => window.removeEventListener("editai:balance", onBalance);
-  }, []);
+  const balance = useLiveBalance(initial, { renderedAt });
   return (
     <Link
       href="/billing"
@@ -33,4 +23,9 @@ export function CreditBalance({ balance: initial, renderedAt, className }: { bal
       <span className="hidden text-muted-foreground sm:inline">créditos</span>
     </Link>
   );
+}
+
+/** Número do saldo que busca o valor atual ao montar (páginas que podem vir do cache). */
+export function LiveCredits({ initial }: { initial: number }) {
+  return <>{useLiveBalance(initial, { fetchOnMount: true })}</>;
 }

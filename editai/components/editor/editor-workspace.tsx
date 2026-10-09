@@ -58,8 +58,12 @@ export function EditorWorkspace({
   // Vem do servidor: voltar/avançar no navegador remonta o editor com dados em
   // cache, então "agora" não serve. min() protege contra relógio local atrasado.
   const signedAtRef = useRef(Math.min(Date.now(), initial.signedAt ?? Date.now()));
+  // Muda quando o usuário escolhe uma versão: uma busca iniciada antes disso
+  // traz a versão atual antiga e não pode desfazer a escolha.
+  const versionChangeSeq = useRef(0);
 
   const refresh = useCallback(async (opts: { renewUrls?: boolean } = {}) => {
+    const seqAtStart = versionChangeSeq.current;
     try {
       const [next, credits] = await Promise.all([
         api.get<ProjectDetail>(`/api/projects/${project.id}`),
@@ -67,10 +71,17 @@ export function EditorWorkspace({
       ]);
       const renew = opts.renewUrls || Date.now() - signedAtRef.current > 45 * 60_000;
       if (renew) signedAtRef.current = Date.now();
+      const versionStale = versionChangeSeq.current !== seqAtStart;
       setDetail((prev) => {
+        const merged = versionStale ? { ...next, project: { ...next.project, current_version_id: prev.project.current_version_id } } : next;
         // Quando um render termina, a nova versão vira a selecionada.
-        if (next.project.current_version_id !== prev.project.current_version_id) setSelectedVersionId(next.project.current_version_id);
-        return renew ? next : keepSignedUrls(prev, next);
+        if (merged.project.current_version_id !== prev.project.current_version_id) setSelectedVersionId(merged.project.current_version_id);
+        return renew ? merged : keepSignedUrls(prev, merged);
+      });
+      // Comando que já foi confirmado (ex.: dados do cache ao voltar no navegador).
+      setPendingCommand((pending) => {
+        const current = pending ? next.commands.find((c) => c.id === pending.id) : undefined;
+        return current && current.status !== "planned" ? null : pending;
       });
       setBalance(credits.balance);
       // Atualiza o saldo do cabeçalho sem recarregar a página.
@@ -145,9 +156,11 @@ export function EditorWorkspace({
   const appliedOps = useMemo(() => (selected ? describePlan(selected.editing_plan) : []), [selected]);
 
   async function selectVersion(id: string) {
+    versionChangeSeq.current++;
     setSelectedVersionId(id);
     // A versão escolhida passa a ser a base dos próximos comandos.
     await api.post(`/api/projects/${project.id}/versions/${id}`).catch(() => undefined);
+    versionChangeSeq.current++;
     setDetail((d) => ({ ...d, project: { ...d.project, current_version_id: id } }));
   }
 

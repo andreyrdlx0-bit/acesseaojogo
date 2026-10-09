@@ -1,4 +1,3 @@
-import { RefreshOnHistoryNavigation } from "@/components/app/refresh-on-history-navigation";
 import { requireUserOrRedirect } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getPaymentProvider } from "@/services/billing";
@@ -16,14 +15,11 @@ export default async function BillingPage() {
     supabase.from("credit_transactions").select("*").order("created_at", { ascending: false }).limit(20),
   ]);
   return (
-    <>
-      <RefreshOnHistoryNavigation />
-      <BillingView
-        balance={credits?.balance ?? 0}
-        planId={sub?.plan_id ?? "free"}
-        transactions={(tx ?? []) as CreditTransaction[]}
-        paymentsEnabled={getPaymentProvider().isConfigured}
-      />
-    </>
+    <BillingView
+      balance={credits?.balance ?? 0}
+      planId={sub?.plan_id ?? "free"}
+      transactions={(tx ?? []) as CreditTransaction[]}
+      paymentsEnabled={getPaymentProvider().isConfigured}
+    />
   );
 }

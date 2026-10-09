@@ -71,6 +71,7 @@ export function ExportModal({
 
   /** Com o modal aberto há muito tempo, a URL de download já expirou: busca outra antes. */
   async function download(e: MouseEvent<HTMLAnchorElement>) {
+    setError(null);
     if (!render || Date.now() - fetchedAt.current < 45 * 60_000) return;
     e.preventDefault();
     try {
@@ -107,6 +108,7 @@ export function ExportModal({
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
+        if (!o) setError(null);
         if (!o && !running) setRender(null);
       }}
     >

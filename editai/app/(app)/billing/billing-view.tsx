@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { CREDIT_PACKS, PAID_PLANS, getPlan } from "@/config/plans";
+import { useLiveBalance } from "@/hooks/use-live-balance";
 import { cn } from "@/lib/utils";
 import type { CreditTransaction } from "@/types/domain";
 import { formatBRL, formatDate } from "@/utils/format";
@@ -30,6 +31,8 @@ export function BillingView({
   transactions: CreditTransaction[];
   paymentsEnabled: boolean;
 }) {
+  // A página pode vir do cache (voltar no navegador): o saldo busca o valor atual.
+  const liveBalance = useLiveBalance(balance, { fetchOnMount: true });
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const current = getPlan(planId);
@@ -59,7 +62,7 @@ export function BillingView({
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-4">
           <Coins className="size-5 text-accent" />
           <div>
-            <p className="font-display text-3xl tabular-nums">{balance}</p>
+            <p className="font-display text-3xl tabular-nums">{liveBalance}</p>
             <p className="text-xs text-muted-foreground">créditos disponíveis</p>
           </div>
         </div>

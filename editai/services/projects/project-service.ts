@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getQueue } from "@/services/queue";
 import { getStorage } from "@/services/storage";
+import { reconcileProject } from "@/services/video/render-finalization";
 import type {
   EditingCommand,
   Project,
@@ -81,7 +82,7 @@ export async function listProjects(userId: string, limit = 50): Promise<ProjectS
   });
 }
 
-export async function getProjectDetail(userId: string, projectId: string): Promise<ProjectDetail> {
+export async function getProjectDetail(userId: string, projectId: string, opts: { reconcile?: boolean } = {}): Promise<ProjectDetail> {
   const project = await getOwnedProject(userId, projectId);
   const client = db();
   const [meta, versions, commands, renders] = await Promise.all([
@@ -94,6 +95,17 @@ export async function getProjectDetail(userId: string, projectId: string): Promi
 
   const versionRows = (versions.data ?? []) as ProjectVersion[];
   const renderRows = (renders.data ?? []) as Render[];
+  const commandRows = (commands.data ?? []) as EditingCommand[];
+
+  // Autocorreção: conclui finalizações que pararam no meio e destrava o
+  // projeto. Nunca derruba a leitura; se algo mudou, lê de novo.
+  if (opts.reconcile !== false) {
+    const changed = await reconcileProject({ project, versions: versionRows, commands: commandRows, renders: renderRows }).catch((error) => {
+      logger.error("render", "Falha na autocorreção do projeto", { projectId, error });
+      return false;
+    });
+    if (changed) return getProjectDetail(userId, projectId, { reconcile: false });
+  }
   const paths = [
     project.original_video_url,
     project.thumbnail_url,
@@ -109,7 +121,7 @@ export async function getProjectDetail(userId: string, projectId: string): Promi
     project,
     metadata: (meta.data as VideoMetadataRow | null) ?? null,
     versions: versionRows.map((v) => ({ ...v, signed_url: sign(v.video_url) })),
-    commands: (commands.data ?? []) as EditingCommand[],
+    commands: commandRows,
     renders: renderRows.map((r) => ({ ...r, signed_url: sign(r.output_url) })),
     originalUrl: sign(project.original_video_url),
     thumbnailUrl: sign(project.thumbnail_url),

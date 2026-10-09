@@ -1,6 +1,6 @@
 import { Coins, Film, FolderOpen, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { RefreshOnHistoryNavigation } from "@/components/app/refresh-on-history-navigation";
+import { LiveCredits } from "@/components/app/credit-balance";
 import { EmptyState } from "@/components/app/states";
 import { ProjectGrid } from "@/components/project/project-card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-5 py-8 lg:px-8">
-      <RefreshOnHistoryNavigation />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Olá{firstName ? `, ${firstName}` : ""}.</p>
@@ -38,7 +37,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Stat icon={Coins} label="Créditos disponíveis" value={credits?.balance ?? 0} href="/billing" />
+        <Stat icon={Coins} label="Créditos disponíveis" value={<LiveCredits initial={credits?.balance ?? 0} />} href="/billing" />
         <Stat icon={FolderOpen} label="Projetos" value={projectCount ?? projects.length} href="/projects" />
         <Stat icon={Film} label="Vídeos processados" value={processed ?? 0} href="/library" />
       </div>
@@ -71,7 +70,7 @@ export default async function DashboardPage() {
   );
 }
 
-function Stat({ icon: Icon, label, value, href }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; href: string }) {
+function Stat({ icon: Icon, label, value, href }: { icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode; href: string }) {
   return (
     <Link href={href} className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent/40">
       <Icon className="size-4 text-accent" />

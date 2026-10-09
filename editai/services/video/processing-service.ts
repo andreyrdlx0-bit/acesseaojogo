@@ -5,13 +5,13 @@ import { VIDEO_FAILURE_MESSAGE } from "@/lib/errors";
 import { isPermanentJobError, PermanentJobError } from "@/services/jobs/errors";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { creditService } from "@/services/credits/credit-service";
 import { getStorage } from "@/services/storage";
 import type { MediaAsset, Project, ProjectVersion, Render, VideoMetadataRow } from "@/types/domain";
 import type { VideoProcessor } from "@/types/services";
 import { storagePaths } from "@/utils/storage-paths";
 import { defaultTmpRoot } from "./fonts";
 import { FfmpegVideoProcessor } from "./engine";
+import { finishCompletedEdit, finishFailedRender, throwIfError } from "./render-finalization";
 
 /**
  * VideoProcessingService (roda no WORKER):
@@ -32,14 +32,19 @@ export class VideoProcessingService {
   async runRender(renderId: string, opts: { deadline?: number } = {}): Promise<void> {
     const db = createSupabaseAdminClient();
     const storage = getStorage();
-    const { data: renderRow } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
+    // Erro de leitura é transitório: nova tentativa, nunca falha definitiva com reembolso.
+    const { data: renderRow, error: renderError } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
+    if (renderError) throw new Error(renderError.message);
     const render = renderRow as Render | null;
     if (!render) throw new PermanentJobError(`Render ${renderId} não encontrado`, VIDEO_FAILURE_MESSAGE);
-    if (render.status === "completed") return;
+    // Execução anterior gravou o resultado mas parou antes do fim: refaz só os
+    // passos finais (idempotentes) e nunca renderiza de novo.
+    if (render.status === "completed") {
+      if (render.kind === "edit") await finishCompletedEdit(render);
+      return;
+    }
     if (render.status === "failed") {
-      // Uma finalização anterior marcou a falha mas pode ter parado no meio:
-      // refaz reembolso e limpeza (idempotentes) e nunca renderiza de novo.
-      await this.finishFailedRender(render);
+      await finishFailedRender(render);
       return;
     }
 
@@ -120,26 +125,11 @@ export class VideoProcessingService {
         { onConflict: "storage_path" },
       );
 
-      if (render.kind === "edit") {
-        // Erros do Supabase vêm em `error` (não lançam): sem checar, o projeto
-        // ficaria preso em "processing". Lançando, o job volta para a fila.
-        throwIfError(
-          await db
-            .from("project_versions")
-            .update({ status: "ready", video_url: outKey, duration: result.duration, width: result.width, height: result.height, size_bytes: result.sizeBytes })
-            .eq("id", version.id),
-        );
-        const busy = await hasOtherActiveEdit(project.id, render.id);
-        throwIfError(
-          await db
-            .from("projects")
-            .update(busy ? { current_version_id: version.id } : { current_version_id: version.id, status: "ready" })
-            .eq("id", project.id),
-        );
-        if (render.command_id) throwIfError(await db.from("editing_commands").update({ status: "rendered" }).eq("id", render.command_id));
-      }
-      await update({
-        status: "completed",
+      // O vídeo já está no storage: grava o render como concluído ANTES dos
+      // passos de projeto/comando. Um erro do banco daqui em diante nunca vira
+      // falha com reembolso — a nova tentativa só refaz os passos finais.
+      const completed = {
+        status: "completed" as const,
         progress: 100,
         stage: "done",
         message: "Seu vídeo está pronto.",
@@ -150,7 +140,9 @@ export class VideoProcessingService {
         output_height: result.height,
         warnings: [...warnings, ...result.warnings],
         completed_at: new Date().toISOString(),
-      });
+      };
+      throwIfError(await update(completed));
+      if (render.kind === "edit") await finishCompletedEdit({ ...render, ...completed });
       logger.info(render.kind === "export" ? "export" : "render", "Render concluído", {
         renderId,
         projectId: project.id,
@@ -169,7 +161,12 @@ export class VideoProcessingService {
     const { data, error: readError } = await db.from("renders").select("*").eq("id", renderId).maybeSingle();
     if (readError) throw new Error(readError.message);
     const render = data as Render | null;
-    if (!render || render.status === "completed") return;
+    if (!render) return;
+    if (render.status === "completed") {
+      // O resultado já foi gravado; só os passos finais ficaram pendentes.
+      if (render.kind === "edit") await finishCompletedEdit(render);
+      return;
+    }
     logger.error("failure", "Render falhou", { renderId, error: internalError });
     const userMessage = isPermanentJobError(internalError) ? internalError.userMessage : VIDEO_FAILURE_MESSAGE;
     if (render.status !== "failed") {
@@ -180,27 +177,7 @@ export class VideoProcessingService {
           .eq("id", renderId),
       );
     }
-    await this.finishFailedRender(render);
-  }
-
-  /**
-   * Reembolso primeiro (o dinheiro não espera a limpeza), depois a limpeza da
-   * edição. Tudo idempotente: se algo falhar, o executor recoloca o job na fila
-   * e a próxima execução (render já "failed") chama isto de novo.
-   */
-  private async finishFailedRender(render: Render): Promise<void> {
-    // Idempotente: (reference_id, reason) é único em credit_transactions.
-    await creditService.refundRender(render.user_id, render.credits_charged, render.id);
-    if (render.kind !== "edit") return;
-    const db = createSupabaseAdminClient();
-    throwIfError(await db.from("project_versions").update({ status: "failed" }).eq("id", render.version_id).neq("status", "ready"));
-    // Outra edição em andamento continua dona do status "processing".
-    if (!(await hasOtherActiveEdit(render.project_id, render.id))) {
-      throwIfError(await db.from("projects").update({ status: "ready" }).eq("id", render.project_id).eq("status", "processing"));
-    }
-    if (render.command_id) {
-      throwIfError(await db.from("editing_commands").update({ status: "failed" }).eq("id", render.command_id).eq("status", "confirmed"));
-    }
+    await finishFailedRender(render);
   }
 
   private async findMusic(userId: string, assetId?: string): Promise<MediaAsset | null> {
@@ -210,21 +187,4 @@ export class VideoProcessingService {
     const { data } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
     return (data as MediaAsset | null) ?? null;
   }
-}
-
-function throwIfError(result: { error: { message: string } | null }): void {
-  if (result.error) throw new Error(result.error.message);
-}
-
-/** Há outra edição na fila ou renderizando neste projeto? */
-async function hasOtherActiveEdit(projectId: string, renderId: string): Promise<boolean> {
-  const { count, error } = await createSupabaseAdminClient()
-    .from("renders")
-    .select("id", { count: "exact", head: true })
-    .eq("project_id", projectId)
-    .eq("kind", "edit")
-    .in("status", ["queued", "processing"])
-    .neq("id", renderId);
-  if (error) throw new Error(error.message);
-  return (count ?? 0) > 0;
 }

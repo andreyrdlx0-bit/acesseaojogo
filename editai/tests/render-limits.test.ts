@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { isPermanentJobError } from "@/services/jobs/errors";
 import { rateBudget } from "@/services/video/engine";
 import { binaries, FfmpegError, runFfmpeg } from "@/services/video/ffmpeg";
 
@@ -37,7 +36,7 @@ describe("ffmpeg interrompido", () => {
     expect(error.timedOut).toBe(true);
   });
 
-  it("morte por sinal externo (ex.: OOM) não é timeout nem falha definitiva", async () => {
+  it("morte por sinal externo (ex.: OOM) não é timeout (o motor só torna timeout definitivo)", async () => {
     const pending = runFfmpeg(longRender).catch((e) => e);
     // Mata o ffmpeg filho deste processo, como o kernel faria num OOM.
     await new Promise((r) => setTimeout(r, 400));
@@ -50,6 +49,5 @@ describe("ffmpeg interrompido", () => {
     expect(error.timedOut).toBe(false);
     expect(error.exitCode).toBeNull();
     expect(error.message).toContain("SIGKILL");
-    expect(isPermanentJobError(error)).toBe(false);
   });
 });
