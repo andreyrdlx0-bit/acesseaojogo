@@ -27,15 +27,20 @@ function applyEnv(cfg: WorkerConfig) {
   if (cfg.host?.remoteHost) env.remoteHost = cfg.host.remoteHost;
   env.useBrowserCache = true; // Cache API: 2ª vez não baixa de novo
   const wasm = env.backends.onnx.wasm;
-  if (cfg.ortWasmBaseUrl && wasm) {
-    // Mesma regra do transformers.js: Safari < 26 sem WebGPU usa o build sem "asyncify".
-    const ua = self.navigator.userAgent;
-    const safari = /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
-    const major = Number(/Version\/(\d+)/.exec(ua)?.[1] ?? 0);
-    const suffix = safari && major < 26 && !("gpu" in self.navigator) ? "" : ".asyncify";
+  if (!wasm) return;
+  // O transformers.js usa o runtime sem "asyncify" no Safari < 26, mas detecta o Safari
+  // por navigator.vendor, que não existe dentro de um worker: a página manda o resultado.
+  const suffix = cfg.safariBelow26 ? "" : ".asyncify";
+  if (cfg.ortWasmBaseUrl) {
     wasm.wasmPaths = {
       mjs: `${cfg.ortWasmBaseUrl}ort-wasm-simd-threaded${suffix}.mjs`,
       wasm: `${cfg.ortWasmBaseUrl}ort-wasm-simd-threaded${suffix}.wasm`,
+    };
+  } else if (cfg.safariBelow26 && wasm.wasmPaths && typeof wasm.wasmPaths === "object") {
+    const paths = wasm.wasmPaths as { mjs?: string | URL; wasm?: string | URL };
+    wasm.wasmPaths = {
+      mjs: paths.mjs ? String(paths.mjs).replace(".asyncify.", ".") : undefined,
+      wasm: paths.wasm ? String(paths.wasm).replace(".asyncify.", ".") : undefined,
     };
   }
 }
@@ -97,6 +102,11 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
     const totalSec = audio.length / SAMPLE_RATE;
 
     const models = { ...DEFAULT_MODELS, ...config.models };
+    // Áudio sem fala (faixa muda): não baixa o modelo à toa.
+    if (!pieces.length) {
+      post({ type: "done", words: [], device: "wasm", modelId: models.wasm.id, elapsedMs: Math.round(performance.now() - t0), loadMs: 0 });
+      return;
+    }
     let device: WhisperDevice = config.preferWebGPU && (await hasWebGPU()) ? "webgpu" : "wasm";
     let asr: AutomaticSpeechRecognitionPipeline;
     const tLoad = performance.now();

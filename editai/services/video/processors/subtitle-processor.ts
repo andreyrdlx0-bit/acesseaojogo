@@ -6,6 +6,7 @@ import type { TranscriptWord } from "@/types/video";
 import { normalizeText } from "@/utils/text";
 import { SUBTITLE_FONT_FAMILY } from "../fonts";
 import { assColor, assFilter, assHeader, dialogue, escapeAssText } from "./ass";
+import { measureText } from "./font-metrics";
 import { build3dSubtitleEvents, subtitle3dBand, subtitle3dStyle, type Subtitle3DOptions } from "./subtitle-3d";
 import { chunkWords, SUBTITLE_SIZE_FACTOR, type VerticalBand } from "./subtitle-layout";
 import type { OperationProcessor, ProcessorContext } from "./types";
@@ -113,14 +114,17 @@ function classicFontSize(op: SubtitleOp, width: number, height: number): number 
 }
 
 /**
- * Faixa vertical que a legenda pode ocupar (até 2 linhas), para os destaques
- * animados não caírem em cima dela.
+ * Faixa vertical que a legenda pode ocupar, para os destaques animados não
+ * caírem em cima dela. Nos estilos clássicos o libass quebra as linhas sozinho,
+ * então a altura vem do maior bloco real (medido com a métrica da Inter Bold).
  */
-export function subtitleBand(op: SubtitleOp, width: number, height: number, economy = false): VerticalBand {
+export function subtitleBand(op: SubtitleOp, width: number, height: number, economy = false, words: TranscriptWord[] = []): VerticalBand {
   if (op.style === "3d") return subtitle3dBand(width, height, subtitle3dOptions(op, economy));
   const fontSize = classicFontSize(op, width, height);
   const outline = op.style === "minimal" ? 0 : Math.max(2, Math.round(fontSize * 0.08));
-  const blockH = 2 * fontSize * 1.05 + 2 * outline + 4;
+  const maxWidth = width - 2 * Math.round(width * 0.08);
+  const lines = Math.max(2, ...chunkWords(words, op.maxWordsPerLine).map((chunk) => countLines(chunk, op, fontSize, maxWidth)));
+  const blockH = Math.min(6, lines) * fontSize * 1.05 + 2 * outline + 4;
   if (op.position === "top") {
     const top = Math.round(height * 0.12);
     return { top: top - outline, bottom: Math.round(top + blockH) };
@@ -128,6 +132,23 @@ export function subtitleBand(op: SubtitleOp, width: number, height: number, econ
   if (op.position === "center") return { top: Math.round(height / 2 - blockH / 2), bottom: Math.round(height / 2 + blockH / 2) };
   const bottom = Math.round(height * 0.88);
   return { top: Math.round(bottom - blockH), bottom: bottom + outline };
+}
+
+/** Linhas que o libass usa para um bloco (quebra gulosa por palavra). */
+function countLines(chunk: TranscriptWord[], op: SubtitleOp, fontSize: number, maxWidth: number): number {
+  const space = measureText(" ", fontSize);
+  let lines = 1;
+  let lineW = 0;
+  for (const w of chunk) {
+    const wordW = measureText(escapeAssText(op.uppercase ? w.word.toUpperCase() : w.word), fontSize);
+    if (lineW > 0 && lineW + space + wordW > maxWidth) {
+      lines++;
+      lineW = wordW;
+    } else {
+      lineW += (lineW > 0 ? space : 0) + wordW;
+    }
+  }
+  return lines;
 }
 
 function styleWord(word: string, op: SubtitleOp, highlight: boolean): string {

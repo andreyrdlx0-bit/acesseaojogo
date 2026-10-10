@@ -14,6 +14,8 @@ export interface WorkerConfig {
   host?: { allowRemoteModels?: boolean; localModelPath?: string; remoteHost?: string };
   /** Hospedagem própria do runtime WASM do ONNX (opcional; padrão = cdn.jsdelivr.net). Ex.: "/ort/" */
   ortWasmBaseUrl?: string;
+  /** Safari < 26 (detectado na página): usa o runtime WASM sem "asyncify". */
+  safariBelow26?: boolean;
 }
 
 export type ToWorker = { type: "transcribe"; audio: Float32Array; config: WorkerConfig };

@@ -27,6 +27,7 @@ export function ExportModal({
   projectId,
   version,
   sourceDuration,
+  hasTranscript,
   maxQuality,
   balance,
   onCreditsChanged,
@@ -34,6 +35,8 @@ export function ExportModal({
   projectId: string;
   version: ProjectVersion | null;
   sourceDuration: number;
+  /** Sem transcrição, legendas e destaques não são desenhados nem cobrados. */
+  hasTranscript: boolean;
   maxQuality: ExportQuality;
   balance: number;
   /** Chamado quando créditos são cobrados ou devolvidos (atualiza o saldo na tela). */
@@ -49,7 +52,7 @@ export function ExportModal({
   const [error, setError] = useState<{ message: string; credits?: boolean } | null>(null);
   const [starting, setStarting] = useState(false);
 
-  const cost = version ? estimateRenderCredits({ sourceDurationSeconds: sourceDuration, plan: version.editing_plan, quality, kind: "export" }) : 0;
+  const cost = version ? estimateRenderCredits({ sourceDurationSeconds: sourceDuration, plan: version.editing_plan, quality, kind: "export", hasTranscript }) : 0;
   const running = render && (render.status === "queued" || render.status === "processing");
 
   usePolling(

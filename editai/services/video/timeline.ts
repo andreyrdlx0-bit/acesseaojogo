@@ -23,8 +23,9 @@ export interface EditTimeline {
   warnings: string[];
 }
 
-const FILLERS = new Set(["e", "eh", "ehh", "ee", "eee", "hum", "hmm", "humm", "ahn", "an", "tipo", "ne", "aham", "uhm", "um", "uh"]);
-const FILLER_ONLY = new Set(["eh", "ehh", "ee", "eee", "hum", "hmm", "humm", "ahn", "uhm", "um", "uh"]);
+// "um" fica de fora: em português é artigo ("um truque"), não hesitação.
+const FILLERS = new Set(["e", "eh", "ehh", "ee", "eee", "hum", "hmm", "humm", "ahn", "an", "tipo", "ne", "aham", "uhm", "uh"]);
+const FILLER_ONLY = new Set(["eh", "ehh", "ee", "eee", "hum", "hmm", "humm", "ahn", "uhm", "uh"]);
 const MIN_SEGMENT = 0.12;
 
 export function buildTimeline(metadata: VideoMetadata, plan: EditingPlan, silences?: TimeRange[]): EditTimeline {
@@ -63,7 +64,7 @@ export function buildTimeline(metadata: VideoMetadata, plan: EditingPlan, silenc
   const retakes = findOperation(plan, "remove_retakes");
   if (retakes) {
     if (!metadata.transcript?.segments.length) {
-      warnings.push("Para remover erros e repetições precisamos da transcrição do vídeo, que não está disponível.");
+      warnings.push("Para remover erros e repetições precisamos da transcrição do vídeo. No editor, use “Transcrever no navegador (grátis)” e peça de novo.");
     } else {
       segments = subtract(segments, detectRetakes(metadata, retakes.removeFillers));
     }

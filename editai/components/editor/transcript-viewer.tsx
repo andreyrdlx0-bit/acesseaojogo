@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { describeOperation, plansEqual, type EditingPlan } from "@/lib/editing-plan";
+import { describeOperation, plansEqual, TRANSCRIPT_REQUIRED_REASON, type EditingPlan } from "@/lib/editing-plan";
 import type { EditingCommand, Render } from "@/types/domain";
 
 /** "Entendi sua instrução:" + plano + custo + [Confirmar edição]. */
@@ -28,6 +28,8 @@ export function TranscriptViewer({
   const ops = command.editing_plan.operations;
   const unchanged = basePlan ? plansEqual(command.editing_plan, basePlan) : ops.length === 0;
   const insufficient = !unchanged && balance < command.estimated_credits;
+  // Itens que ficaram de fora por falta de transcrição já são explicados na resposta.
+  const invalid = command.rejected_operations.filter((r) => r.reason !== TRANSCRIPT_REQUIRED_REASON);
 
   async function confirm() {
     setPending("confirm");
@@ -70,10 +72,10 @@ export function TranscriptViewer({
           ))}
         </ul>
       )}
-      {command.rejected_operations.length > 0 && (
+      {invalid.length > 0 && (
         <p className="flex items-start gap-2 text-xs text-amber-300">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          {command.rejected_operations.length} sugestão(ões) da IA foram descartadas por não serem válidas.
+          {invalid.length} sugestão(ões) da IA foram descartadas por não serem válidas.
         </p>
       )}
 

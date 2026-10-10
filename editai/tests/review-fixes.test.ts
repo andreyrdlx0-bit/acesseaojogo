@@ -63,10 +63,10 @@ describe("plansEqual", () => {
 describe("estimateRenderCredits", () => {
   it("trim inválido é cobrado como vídeo inteiro (igual ao render)", () => {
     const plan = { version: 1 as const, operations: [{ type: "trim" as const, enabled: true, start: 590 }] };
-    expect(estimateRenderCredits({ sourceDurationSeconds: 300, plan, quality: "720p", kind: "edit" })).toBe(10);
+    expect(estimateRenderCredits({ sourceDurationSeconds: 300, plan, quality: "720p", kind: "edit", hasTranscript: true })).toBe(10);
   });
   it("trim válido reduz o custo", () => {
     const plan = validateEditingPlan({ operations: [{ type: "trim", start: 0, end: 30 }] }).plan;
-    expect(estimateRenderCredits({ sourceDurationSeconds: 300, plan, quality: "720p", kind: "edit" })).toBe(1);
+    expect(estimateRenderCredits({ sourceDurationSeconds: 300, plan, quality: "720p", kind: "edit", hasTranscript: true })).toBe(1);
   });
 });

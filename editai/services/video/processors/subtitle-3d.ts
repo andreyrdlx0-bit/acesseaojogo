@@ -183,7 +183,10 @@ export function build3dSubtitleEvents(words: TranscriptWord[], o: Subtitle3DOpti
     const start = chunk[0]!.start;
     const lastEnd = chunk[chunk.length - 1]!.end;
     const next = chunks[ci + 1]?.[0]?.start ?? Infinity;
-    const end = Math.max(lastEnd, Math.min(next, lastEnd + 0.3));
+    // Nunca passa do início do próximo bloco: as camadas têm \pos fixo e o libass não
+    // empurra uma legenda para longe da outra (os dois blocos se misturariam na tela).
+    const end = Math.min(next, lastEnd + 0.3);
+    if (end - start < 0.04) return;
     const layout = layoutChunk(chunk, p.fontSize, W - 2 * p.marginLR, o.economy ? 100 : KARAOKE_SCALE);
     // \q2: sem quebra automática (a quebra já veio do layoutChunk). Sem \fad de
     // propósito: camadas translúcidas sobrepostas "lavam" a face.

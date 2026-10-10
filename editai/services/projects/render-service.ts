@@ -8,6 +8,7 @@ import { creditService } from "@/services/credits/credit-service";
 import { getQueue } from "@/services/queue";
 import { getStorage } from "@/services/storage";
 import type { Project, ProjectVersion, Render, RenderKind, RenderOptions, VideoMetadataRow } from "@/types/domain";
+import type { VideoMetadata } from "@/types/video";
 import { getOwnedProject } from "./project-service";
 
 const db = () => createSupabaseAdminClient();
@@ -48,6 +49,7 @@ export async function enqueueRender(input: EnqueueInput): Promise<Render> {
     plan: input.plan,
     quality: input.options.quality,
     kind: input.kind,
+    hasTranscript: Boolean(metadata.transcript?.words.length),
   });
   const balance = await creditService.getBalance(input.userId);
   if (balance < credits) throw Errors.insufficientCredits(credits, balance);
@@ -150,6 +152,13 @@ export async function getRenderForUser(userId: string, renderId: string) {
 
 export async function estimateCommandCost(userId: string, projectId: string, plan: EditingPlan, options: RenderOptions, kind: RenderKind) {
   await getOwnedProject(userId, projectId);
-  const { data } = await db().from("video_metadata").select("duration").eq("project_id", projectId).maybeSingle();
-  return estimateRenderCredits({ sourceDurationSeconds: Number(data?.duration ?? 0), plan, quality: options.quality, kind });
+  const { data } = await db().from("video_metadata").select("duration, metadata").eq("project_id", projectId).maybeSingle();
+  const metadata = (data?.metadata ?? null) as VideoMetadata | null;
+  return estimateRenderCredits({
+    sourceDurationSeconds: Number(data?.duration ?? 0),
+    plan,
+    quality: options.quality,
+    kind,
+    hasTranscript: Boolean(metadata?.transcript?.words.length),
+  });
 }

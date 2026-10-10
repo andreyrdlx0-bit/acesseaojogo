@@ -46,6 +46,14 @@ export function browserTranscriptionBlocker(): string | null {
   return null;
 }
 
+/** Mesma regra do transformers.js, mas aqui na página, onde navigator.vendor existe. */
+function isSafariBelow26(): boolean {
+  const ua = navigator.userAgent;
+  const safari = (navigator.vendor || "").includes("Apple") && !/CriOS|FxiOS|EdgiOS|OPiOS|mercury|brave|Chrome|Android/i.test(ua);
+  const major = Number(/Version\/(\d+)/.exec(ua)?.[1] ?? 0);
+  return safari && major > 0 && major < 26;
+}
+
 let worker: Worker | null = null;
 function getWorker(): Worker {
   // new URL(..., import.meta.url) é o padrão que o webpack do Next entende para empacotar o worker.
@@ -98,7 +106,7 @@ export async function transcribeVideoInBrowser(
   signal?.throwIfAborted();
 
   // WASM (CPU) é o caminho testado de ponta a ponta; WebGPU fica desligado por padrão.
-  const config: WorkerConfig = { language: "portuguese", preferWebGPU: false, ...opts.config };
+  const config: WorkerConfig = { language: "portuguese", preferWebGPU: false, safariBelow26: isSafariBelow26(), ...opts.config };
   const w = getWorker();
   let device: WhisperDevice = "wasm";
 
@@ -133,6 +141,8 @@ export async function transcribeVideoInBrowser(
           break;
         case "done":
           cleanup();
+          // Libera o modelo (~1 GB de memória WASM que nunca encolhe); os arquivos ficam no cache.
+          disposeBrowserTranscriber();
           resolve({
             language: "pt",
             provider: `transformers.js@4.3.0/${m.modelId}/${m.device}`.slice(0, 80),

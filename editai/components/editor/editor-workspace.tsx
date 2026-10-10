@@ -58,6 +58,10 @@ export function EditorWorkspace({
   const activeRender = renders.find((r) => r.kind === "edit" && (r.status === "queued" || r.status === "processing"));
   const lastEditRender = renders.find((r) => r.kind === "edit");
   const analyzing = project.status === "analyzing" || metadata?.analysis_status === "pending" || metadata?.analysis_status === "processing";
+  const hasTranscript = Boolean(metadata?.metadata?.transcript?.words.length);
+  // Versão renderizada antes da transcrição existir: o mesmo plano agora sai com legendas/destaques.
+  const missedTranscript = (versionId: string | null) =>
+    hasTranscript && renders.some((r) => r.version_id === versionId && r.kind === "edit" && r.warnings.some((w) => /transcri/i.test(w)));
 
   // Quando as URLs assinadas (válidas por 1h) foram geradas pela última vez.
   // Vem do servidor: voltar/avançar no navegador remonta o editor com dados em
@@ -204,6 +208,7 @@ export function EditorWorkspace({
           projectId={project.id}
           version={selected}
           sourceDuration={metadata?.metadata?.duration ?? 0}
+          hasTranscript={hasTranscript}
           maxQuality={maxQuality}
           balance={balance}
           onCreditsChanged={refreshTwice}
@@ -299,7 +304,11 @@ export function EditorWorkspace({
             <TranscriptViewer
               command={pendingCommand}
               balance={balance}
-              basePlan={versions.find((v) => v.id === pendingCommand.base_version_id)?.editing_plan ?? null}
+              basePlan={
+                missedTranscript(pendingCommand.base_version_id)
+                  ? null
+                  : (versions.find((v) => v.id === pendingCommand.base_version_id)?.editing_plan ?? null)
+              }
               onConfirmed={onRenderStarted}
               onDiscarded={() => {
                 setPendingCommand(null);

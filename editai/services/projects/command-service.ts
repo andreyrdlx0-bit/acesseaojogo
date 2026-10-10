@@ -1,7 +1,15 @@
 import { estimateRenderCredits } from "@/config/credits";
 import { getPlan } from "@/config/plans";
 import { AUDIO_MIME_TYPES, baseMime, MAX_AUDIO_COMMAND_MB, MAX_INSTRUCTION_CHARS } from "@/config/upload";
-import { EMPTY_PLAN, describePlan, normalizeEditingPlan, plansEqual, type EditingPlan } from "@/lib/editing-plan";
+import {
+  EMPTY_PLAN,
+  describePlan,
+  needsTranscript,
+  normalizeEditingPlan,
+  plansEqual,
+  withoutTranscriptOps,
+  type EditingPlan,
+} from "@/lib/editing-plan";
 import { AppError, Errors } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -137,11 +145,12 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
   };
 
   // 3. IA interpreta → JSON → validação (dentro do planner).
+  const basePlan = ((base as ProjectVersion).editing_plan as EditingPlan) ?? EMPTY_PLAN;
   const planner = getEditingPlanner();
   const started = Date.now();
   const result = await planner.createEditingPlan({
     instruction,
-    currentPlan: ((base as ProjectVersion).editing_plan as EditingPlan) ?? EMPTY_PLAN,
+    currentPlan: basePlan,
     video,
     mode: input.mode,
     history: (history ?? [])
@@ -156,7 +165,35 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
     ms: Date.now() - started,
   });
 
-  const credits = estimateRenderCredits({ sourceDurationSeconds: metadata.duration, plan: result.plan, quality: "720p", kind: "edit" });
+  // Sem transcrição, legendas/destaques/zoom por palavra não seriam desenhados: saem
+  // do plano (e do custo) e a resposta explica o que fazer.
+  let plan = result.plan;
+  let rejected = result.rejected;
+  let reply = result.reply;
+  if (!video.hasTranscript) {
+    const stripped = withoutTranscriptOps(plan);
+    if (stripped.rejected.length) {
+      const removed = plan.operations.filter(needsTranscript);
+      const askedNow = removed.some(
+        (op) => !basePlan.operations.some((b) => b.type === op.type && plansEqual({ version: 1, operations: [b] }, { version: 1, operations: [op] })),
+      );
+      plan = stripped.plan;
+      rejected = [...rejected, ...stripped.rejected];
+      if (askedNow) {
+        reply += video.hasAudio
+          ? " Legendas, destaques animados, zoom por palavra e corte de erros precisam da transcrição: use “Transcrever no navegador (grátis)” no editor e peça de novo."
+          : " Como o vídeo não tem áudio, não dá para fazer legendas, destaques ou zoom por palavra.";
+      }
+    }
+  }
+
+  const credits = estimateRenderCredits({
+    sourceDurationSeconds: metadata.duration,
+    plan,
+    quality: "720p",
+    kind: "edit",
+    hasTranscript: video.hasTranscript,
+  });
   const { data: command, error } = await client
     .from("editing_commands")
     .insert({
@@ -167,9 +204,9 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
       transcription,
       transcription_source: source,
       instruction_text: instruction,
-      editing_plan: result.plan,
-      assistant_reply: result.reply,
-      rejected_operations: result.rejected,
+      editing_plan: plan,
+      assistant_reply: reply,
+      rejected_operations: rejected,
       planner_provider: result.provider,
       status: "planned",
       base_version_id: baseVersionId,
@@ -193,7 +230,7 @@ export async function confirmEditingCommand(userId: string, commandId: string) {
   const project = await getOwnedProject(userId, command.project_id);
   if (command.base_version_id) {
     const { data: base } = await client.from("project_versions").select("editing_plan").eq("id", command.base_version_id).maybeSingle();
-    if (base && plansEqual(plan, base.editing_plan as EditingPlan)) {
+    if (base && plansEqual(plan, base.editing_plan as EditingPlan) && !(await baseMissedTranscript(project.id, command.base_version_id))) {
       throw Errors.validation("Essa instrução não muda o vídeo. Diga o que você quer alterar.");
     }
   }
@@ -219,6 +256,21 @@ export async function confirmEditingCommand(userId: string, commandId: string) {
   }
   await client.from("editing_commands").update({ result_version_id: render.version_id }).eq("id", command.id);
   return render;
+}
+
+/**
+ * A versão de partida foi renderizada sem a transcrição que agora existe: o
+ * mesmo plano, renderizado de novo, passa a ter legendas/destaques.
+ */
+async function baseMissedTranscript(projectId: string, baseVersionId: string): Promise<boolean> {
+  const client = db();
+  const [{ data: meta }, { data: renders }] = await Promise.all([
+    client.from("video_metadata").select("metadata").eq("project_id", projectId).maybeSingle(),
+    client.from("renders").select("warnings").eq("version_id", baseVersionId).eq("kind", "edit"),
+  ]);
+  const metadata = (meta?.metadata ?? null) as VideoMetadataRow["metadata"];
+  if (!metadata?.transcript?.words.length) return false;
+  return (renders ?? []).some((r) => ((r.warnings as string[] | null) ?? []).some((w) => /transcri/i.test(w)));
 }
 
 export async function discardEditingCommand(userId: string, commandId: string) {

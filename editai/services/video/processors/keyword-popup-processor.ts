@@ -40,7 +40,7 @@ export const KeywordPopupProcessor: OperationProcessor = {
     const subtitles = findOperation(ctx.plan, "subtitles");
     const ass = buildPopupAss(hits, op, width, height, {
       subtitlePosition: subtitles?.position ?? null,
-      avoid: subtitles ? subtitleBand(subtitles, width, height, subtitleEconomy(ctx)) : undefined,
+      avoid: subtitles ? subtitleBand(subtitles, width, height, subtitleEconomy(ctx), ctx.words) : undefined,
     });
     const file = path.join(ctx.workDir, "popups.ass");
     await writeFile(file, ass, "utf8");
@@ -158,11 +158,11 @@ export function buildPopupEvents(
     const slot = layout.slots[shown++ % layout.slots.length]!;
     const text = escapeAssText(hit.text);
     const iconOn = op.icons;
-    // Diminui o corpo até o cartão caber na largura máxima.
+    // Diminui o corpo até o cartão caber na largura máxima (o \fs vai em todos os eventos).
     let fs = layout.fontSize;
     const cardWidth = (size: number) =>
       measureText(text, size) + (iconOn ? Math.round(size * 1.12) + measureText(" ", size) - Math.round(size * 0.5) * 0.25 : 0) + 2 * Math.round(size * 0.5);
-    for (let tries = 0; tries < 8 && cardWidth(fs) > layout.maxCardW; tries++) fs = Math.max(8, Math.floor(fs * 0.9));
+    for (let tries = 0; tries < 30 && fs > 8 && cardWidth(fs) > layout.maxCardW; tries++) fs = Math.max(8, Math.floor(fs * 0.92));
     const em = fs * EM_PER_FS;
     const S = iconOn ? Math.round(fs * 1.12) : 0;
     const cardH = Math.round(fs * 1.6);
@@ -175,7 +175,9 @@ export function buildPopupEvents(
     const D = Math.max(DESCENT * em, pbo);
     const capsOffset = (A - D) / 2 - (CAP_HEIGHT * em) / 2;
 
-    const cx = slot.x;
+    // Mantém o cartão inteiro dentro do quadro.
+    const halfW = cardW / 2 + cardH * 0.1 + shadowPx(fs);
+    const cx = Math.round(clamp(slot.x, halfW + W * 0.02, W - halfW - W * 0.02));
     const half = cardH / 2 + Math.abs(Math.sin((slot.rot * Math.PI) / 180)) * (cardW / 2) + shadowPx(fs);
     let cy = slot.y;
     if (avoid) {
@@ -192,7 +194,7 @@ export function buildPopupEvents(
     const anim =
       `\\fscx30\\fscy30\\t(0,140,0.8,\\fscx112\\fscy112)\\t(140,230,\\fscx96\\fscy96)\\t(230,300,\\fscx100\\fscy100)` +
       `\\t(${Math.max(300, dur - 160)},${dur},\\fscx70\\fscy70)\\fad(90,160)`;
-    const common = (y: number) => `\\an5\\pos(${cx},${y})\\org(${cx},${cy})\\frz${slot.rot}\\bord0\\shad0`;
+    const common = (y: number) => `\\an5\\fs${fs}\\pos(${cx},${y})\\org(${cx},${cy})\\frz${slot.rot}\\bord0\\shad0`;
 
     const light = op.theme === "light";
     const cardColor = light ? "#FFFFFF" : accent;

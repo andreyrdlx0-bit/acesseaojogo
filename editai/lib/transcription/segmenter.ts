@@ -90,7 +90,9 @@ export function cleanPieceWords(words: TimedWord[], pieceDur: number): { words: 
   let ws = words
     .filter((w) => w.word.length > 0 && w.start < pieceDur - 0.02)
     .map((w) => ({ ...w, end: Math.min(Math.max(w.end, w.start + 0.05), pieceDur) }));
-  let loopTrimmed = false;
+  // Laço com os tempos jogados para depois do fim do pedaço: o filtro acima esvazia a
+  // lista antes da busca de n-gramas, então a maior parte "sumindo" também conta como laço.
+  let loopTrimmed = words.length >= 20 && ws.length < words.length / 2;
   const key = (from: number, len: number) => ws.slice(from, from + len).map((w) => w.word.toLowerCase()).join(" ");
   // Laço = mesmo n-grama repetido em sequência: 1–2 palavras 4x ("não não não" é fala real), 3–8 palavras 3x.
   outer: for (let len = 1; len <= 8; len++) {
@@ -106,7 +108,9 @@ export function cleanPieceWords(words: TimedWord[], pieceDur: number): { words: 
       }
     }
   }
-  if (HALLUCINATION_PATTERNS.some((r) => r.test(ws.map((w) => w.word).join(" ")))) return { words: [], loopTrimmed };
+  // Só descarta quando a frase alucinada é praticamente tudo o que veio: uma despedida
+  // real ("Obrigado por assistir, deixa seu like...") no meio da fala fica.
+  if (ws.length <= 8 && HALLUCINATION_PATTERNS.some((r) => r.test(ws.map((w) => w.word).join(" ")))) return { words: [], loopTrimmed };
   return { words: ws, loopTrimmed };
 }
 

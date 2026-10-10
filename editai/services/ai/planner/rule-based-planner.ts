@@ -54,13 +54,17 @@ export class RuleBasedPlanner implements AIEditingPlanner {
     if (autopilot) {
       set("remove_silence", { minSilenceMs: 400, thresholdDb: -35, paddingMs: 100 });
       set("remove_retakes", { removeFillers: true });
-      set("subtitles", { ...(get("subtitles") ?? {}), enabled: true, style: "karaoke", size: "large", position: "center", uppercase: true } as never);
+      // Pedido (ou já escolhido) de legenda 3D vale também no piloto automático.
+      const style = has("3d", "3 d", "tridimension", "relevo") || get("subtitles")?.style === "3d" ? "3d" : "karaoke";
+      set("subtitles", { ...(get("subtitles") ?? {}), enabled: true, style, size: "large", position: "center", uppercase: true } as never);
       set("audio_enhancement", { preset: "voice" });
       if (!get("speed")) set("speed", { factor: 1.1 });
       drop("zoom");
       ops.push(editingOperationSchema.parse({ type: "zoom", trigger: { kind: "emphasis", everySeconds: 5 }, scale: 1.12 }));
       if (has("tiktok", "reels", "shorts", "stories", "vertical") || input.mode === "autopilot") set("aspect_ratio", { ratio: "9:16", fit: "crop" });
-      actions.push("cortar pausas e erros, acelerar levemente, colocar legendas dinâmicas, fazer zooms nos momentos-chave e melhorar o áudio para prender a atenção");
+      actions.push(
+        `cortar pausas e erros, acelerar levemente, colocar legendas ${style === "3d" ? "em 3D" : "dinâmicas"}, fazer zooms nos momentos-chave e melhorar o áudio para prender a atenção`,
+      );
     }
 
     // Cada oração é interpretada isoladamente ("remova X e coloque Y").
@@ -73,7 +77,14 @@ export class RuleBasedPlanner implements AIEditingPlanner {
       "nao tem som", "sem som", "nao tem audio", "sem audio", "nao tem fala", "sem fala", "ninguem fala", "nao falo",
       "parte muda", "partes mudas", "fica mudo", "fico calad", "fica calad", "tempo morto", "momentos vazios", "partes vazias",
     );
-    if (noSound && !autopilot && !has("legenda")) {
+    // "sem som de fundo" é pedido de limpar ruído, não de cortar o vídeo.
+    if (
+      noSound &&
+      !autopilot &&
+      !has("legenda") &&
+      has("cort", "remov", "tir", "onde", "aonde", "parte", "trecho", "momento", "tempo morto") &&
+      !has("de fundo", "ambiente", "ruido", "chiado", "barulho", "musica")
+    ) {
       set("remove_silence", { minSilenceMs: 500, thresholdDb: -35, paddingMs: 100 });
       actions.push("cortar as partes sem fala");
     }
@@ -84,7 +95,7 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         actions.push(long ? "remover as pausas longas" : "remover os silêncios");
       }
     }
-    if (has("dinamic", "cortes mais rapidos", "mais ritmo", "agil", "estrateg", "cortes inteligentes") && !autopilot) {
+    if ((has("dinamic", "cortes mais rapidos", "mais ritmo", "agil", "cortes inteligentes") || (has("estrateg") && has("cort"))) && !autopilot) {
       set("remove_silence", { minSilenceMs: 400, thresholdDb: -35, paddingMs: 90 });
       const current = get("speed")?.factor ?? 1;
       set("speed", { factor: clamp(Math.max(current, 1) * 1.08, 0.5, 1.5) });
@@ -118,7 +129,11 @@ export class RuleBasedPlanner implements AIEditingPlanner {
     // Legendas
     if (has("legenda") && !autopilot) {
       const current = get("subtitles");
-      if (removing) {
+      if (removing && current?.style === "3d" && has("3d", "3 d", "relevo", "profundidade", "efeito")) {
+        // "tire o 3D" mantém as legendas, só volta ao estilo normal.
+        set("subtitles", { ...current, style: "bold" });
+        actions.push("tirar o efeito 3D das legendas");
+      } else if (removing) {
         drop("subtitles");
         drop("subtitle_style");
         actions.push("remover as legendas");
@@ -138,6 +153,7 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         if (has("karaoke", "palavra por palavra")) next.style = "karaoke";
         if (has("simples", "discret", "minimal")) next.style = "minimal";
         if (has("caixa", "fundo")) next.style = "clean";
+        if (has("normal", "normais", "comum", "comuns", "padrao")) next.style = "bold";
         if (has("3d", "3 d", "tridimension", "profundidade", "relevo")) next.style = "3d";
         if (has("amarel")) next.highlightColor = "#FACC15";
         if (has("verde")) next.highlightColor = "#22C55E";
@@ -153,29 +169,49 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         );
       }
     }
-    if (has("destaq", "palavras importantes", "palavras chave")) {
-      const base = (get("subtitles") ?? editingOperationSchema.parse({ type: "subtitles" })) as OperationOf<"subtitles">;
-      set("subtitles", { ...base, enabled: true, highlightKeywords: true });
-      actions.push("destacar as palavras importantes nas legendas");
+    // Destaques animados (cards na tela) têm prioridade sobre o destaque de palavras na legenda.
+    const popupWords =
+      has("elemento", "pop up", "popup", "emoji", "icone", "destaques animados", "destaque animado", "cards na tela") ||
+      (/(?:^| )(?:sobre o que|do que) (?:eu |ela |ele |a pessoa |voce )?(?:fala|falo|diz|digo|esta falando|estou falando)\b/.test(text) &&
+        !has("legenda", "musica", "trilha", "zoom", "volume")) ||
+      // "mostre um destaque quando eu falar dinheiro" = cartão na tela, não cor na legenda.
+      (has("destaq") && !has("legenda") && /quando (?:eu )?(?:falar|disser|mencionar|citar)\b/.test(text));
+    if (has("destaq", "palavras importantes", "palavras chave") && !popupWords) {
+      const subs = get("subtitles");
+      if (removing) {
+        if (subs?.highlightKeywords) {
+          set("subtitles", { ...subs, highlightKeywords: false });
+          actions.push("tirar o destaque das palavras nas legendas");
+        }
+      } else {
+        const base = (subs ?? editingOperationSchema.parse({ type: "subtitles" })) as OperationOf<"subtitles">;
+        set("subtitles", { ...base, enabled: true, highlightKeywords: true });
+        actions.push("destacar as palavras importantes nas legendas");
+      }
     }
 
     // Elementos sobre o que a pessoa fala (destaques animados das palavras-chave)
-    if (
-      has("elemento", "pop up", "popup", "emoji", "icone", "destaques animados", "destaque animado", "cards na tela") ||
-      (has("sobre o que", "do que") && has("fala", "falo", "diz", "digo"))
-    ) {
-      if (removing) {
+    if (popupWords) {
+      // "sem exagero", "sem ícones" não são pedidos de remoção.
+      const removePopups =
+        has("remov", "tirar", "tire ", "tira ", "desativ", "desliga", "nao quero") && !has("coloq", "adicion", "poe ", "bot", "acrescent");
+      if (removePopups) {
         drop("keyword_popups");
         actions.push("remover os destaques animados");
       } else {
-        const keywords = extractKeywords(text);
+        const keywords = extractSpokenKeywords(text);
         const prev = get("keyword_popups");
+        const position = has("em cima", "no topo", "parte de cima")
+          ? "top"
+          : has("no centro", "no meio", "centraliz")
+            ? "center"
+            : (prev?.position ?? "auto");
         set("keyword_popups", {
           keywords: keywords.length ? keywords : (prev?.keywords ?? []),
           perMinute: prev?.perMinute ?? 6,
-          position: prev?.position ?? "auto",
+          position,
           theme: prev?.theme ?? "light",
-          icons: prev?.icons ?? true,
+          icons: has("sem icone", "sem emoji") ? false : has("com icone", "com emoji") ? true : (prev?.icons ?? true),
           color: prev?.color ?? "#FACC15",
         });
         actions.push(
@@ -344,14 +380,32 @@ function splitClauses(instruction: string): string[] {
     .filter(Boolean);
 }
 
-function extractKeywords(text: string): string[] {
-  const m = text.match(/(?:quando (?:eu )?(?:falar|disser|digo|mencionar|citar)|na palavra|nas palavras|em)\s+(?:sobre |de |em |a palavra |o |a )?([\p{L}\s]+?)(?:\s+e\s+(?:deixe|coloque|faca|remova|tire)|$)/u);
-  if (!m) return [];
-  return m[1]!
+// Palavras de escopo/posição que nunca são o "assunto" pedido ("em todo o vídeo", "em cima").
+const NOT_KEYWORDS = new Set(
+  "momentos momento importantes importante partes parte video videos todo toda todos cada frase frases cima baixo meio centro tela palavra palavras falo fala diz digo emojis emoji icones elementos legendas legenda".split(
+    " ",
+  ),
+);
+
+function keywordList(raw: string): string[] {
+  return raw
     .split(/\s+e\s+|,|\s+ou\s+/)
     .map((w) => w.trim().split(" ").filter((p) => p.length > 2).pop() ?? "")
-    .filter((w) => w.length > 2 && !["momentos", "importantes", "partes"].includes(w))
+    .filter((w) => w.length > 2 && !NOT_KEYWORDS.has(w))
     .slice(0, 5);
+}
+
+function extractKeywords(text: string): string[] {
+  const m = text.match(/(?:quando (?:eu )?(?:falar|disser|digo|mencionar|citar)|na palavra|nas palavras|(?:^|\s)em)\s+(?:sobre |de |em |a palavra |o |a )?([\p{L}\s]+?)(?:\s+e\s+(?:deixe|coloque|faca|remova|tire)|$)/u);
+  return m ? keywordList(m[1]!) : [];
+}
+
+/** Só formas explícitas ("quando eu falar X", "a palavra X"): o resto é escolha automática. */
+function extractSpokenKeywords(text: string): string[] {
+  const m = text.match(
+    /(?:quando (?:eu |ela |ele )?(?:falar|disser|digo|mencionar|citar)|(?:na|nas|a|as) palavras?)\s+(?:sobre |de |a palavra |o |a )?([\p{L}\s]+?)(?:\s+e\s+(?:deixe|coloque|faca|remova|tire)|$)/u,
+  );
+  return m ? keywordList(m[1]!) : [];
 }
 
 function toNumber(token: string): number | null {
