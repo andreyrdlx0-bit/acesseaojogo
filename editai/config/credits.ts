@@ -10,7 +10,7 @@ export const SIGNUP_BONUS_CREDITS = 30;
  *
  * - 1 crédito a cada 30s de vídeo de entrada (limite superior da saída);
  * - 1080p custa 1.5x;
- * - legendas e música adicionam 1 crédito cada (custo de transcrição/mixagem);
+ * - legendas, destaques animados e música adicionam 1 crédito cada;
  * - exportação de uma versão já editada custa metade (mínimo 1).
  */
 export function estimateRenderCredits(input: {
@@ -32,6 +32,7 @@ export function estimateRenderCredits(input: {
   let credits = Math.max(1, Math.ceil(effective / 30));
   if (input.quality === "1080p") credits = Math.ceil(credits * 1.5);
   if (findOperation(input.plan, "subtitles")) credits += 1;
+  if (findOperation(input.plan, "keyword_popups")) credits += 1;
   if (findOperation(input.plan, "background_music")) credits += 1;
   if (input.kind === "export") credits = Math.max(1, Math.ceil(credits / 2));
   return credits;

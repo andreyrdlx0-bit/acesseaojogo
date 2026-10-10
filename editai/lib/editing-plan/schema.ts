@@ -66,7 +66,7 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const subtitlesOp = z.object({
   type: z.literal("subtitles"),
   ...base,
-  style: z.enum(["bold", "clean", "karaoke", "minimal"]).default("bold"),
+  style: z.enum(["bold", "clean", "karaoke", "minimal", "3d"]).default("bold"),
   position: subtitlePosition.default("bottom"),
   size: subtitleSize.default("large"),
   uppercase: z.boolean().default(false),
@@ -182,6 +182,22 @@ export const colorAdjustmentOp = z.object({
   saturation: z.number().min(0).max(3).default(1),
 });
 
+/**
+ * "Elementos sobre o que a pessoa fala": destaques animados das palavras-chave
+ * da fala (cards que aparecem sincronizados com a palavra). Precisa da
+ * transcrição com tempo por palavra.
+ */
+export const keywordPopupsOp = z.object({
+  type: z.literal("keyword_popups"),
+  ...base,
+  /** Palavras pedidas pelo usuário/IA; vazio = escolha automática a partir da fala. */
+  keywords: z.array(z.string().min(1).max(40)).max(30).default([]),
+  /** Máximo de destaques por minuto do vídeo final. */
+  perMinute: z.number().int().min(1).max(20).default(6),
+  position: z.enum(["top", "center"]).default("top"),
+  color: hexColor.default("#FACC15"),
+});
+
 export const bRollOp = z.object({
   type: z.literal("b_roll"),
   ...base,
@@ -207,6 +223,7 @@ export const operationSchemas = [
   transitionsOp,
   textOverlayOp,
   colorAdjustmentOp,
+  keywordPopupsOp,
   bRollOp,
 ] as const;
 

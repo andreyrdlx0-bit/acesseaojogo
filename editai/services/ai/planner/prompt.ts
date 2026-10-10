@@ -23,7 +23,7 @@ Operações disponíveis (campos opcionais têm padrão):
 - {"type":"remove_silence","minSilenceMs":600,"thresholdDb":-35,"paddingMs":120}  remover pausas. "mais dinâmico/cortes mais rápidos" => minSilenceMs menor (350-450).
 - {"type":"remove_retakes","removeFillers":true}  remover erros, frases recomeçadas e "éé/hum".
 - {"type":"shorten","targetSeconds":30,"strategy":"highlights"|"beginning"}  versão curta/versão de N segundos.
-- {"type":"subtitles","enabled":true,"style":"bold"|"clean"|"karaoke"|"minimal","position":"top"|"center"|"bottom","size":"small"|"medium"|"large"|"xl","uppercase":false,"highlightKeywords":true,"color":"#FFFFFF","highlightColor":"#FACC15","maxWordsPerLine":4}  "enabled":false remove legendas.
+- {"type":"subtitles","enabled":true,"style":"bold"|"clean"|"karaoke"|"minimal"|"3d","position":"top"|"center"|"bottom","size":"small"|"medium"|"large"|"xl","uppercase":false,"highlightKeywords":true,"color":"#FFFFFF","highlightColor":"#FACC15","maxWordsPerLine":4}  "enabled":false remove legendas.
 - {"type":"audio_enhancement","preset":"voice"|"podcast"|"loud"}  melhorar a voz.
 - {"type":"noise_reduction","strength":"low"|"medium"|"high"}
 - {"type":"volume","gainDb":6}  entre -20 e 20.
@@ -37,6 +37,7 @@ Operações disponíveis (campos opcionais têm padrão):
 - {"type":"transitions","style":"fade","durationMs":400}
 - {"type":"text_overlay","text":"...","start":0,"end":3,"position":"top","size":"large"}
 - {"type":"color_adjustment","preset":"none"|"vivid"|"warm"|"cool"|"bw"|"cinematic","brightness":0,"contrast":1,"saturation":1}
+- {"type":"keyword_popups","keywords":[],"perMinute":6,"position":"top"|"center","color":"#FACC15"}  destaques animados (cards) com as palavras-chave da fala, sincronizados com o momento em que são ditas. keywords vazio = escolha automática. "elementos/coisas sobre o que eu falo", "pop-ups", "destaques na tela" => keyword_popups.
 - {"type":"b_roll","prompts":["..."]}  (em breve; use só se pedirem explicitamente)
 
 Interpretações úteis:
@@ -44,6 +45,7 @@ Interpretações úteis:
 - "mais dinâmico" => remove_silence (minSilenceMs ~400), speed ~1.1, zoom emphasis.
 - "versão para TikTok/Reels" => aspect_ratio 9:16 e, se fizer sentido, legendas bold.
 - "deixe as legendas maiores" => aumente "size" em um nível mantendo o resto.
+- "legendas 3D" => subtitles style "3d". "cortes onde não tem som/fala" => remove_silence.
 - Modo AUTOPILOT ("deixe mais interessante para TikTok", "otimize"): analise hook, ritmo, silêncios, legendas, zoom, áudio e duração e monte um plano completo de alta retenção.`;
 
 export function buildPlannerUserMessage(input: EditingRequest): string {

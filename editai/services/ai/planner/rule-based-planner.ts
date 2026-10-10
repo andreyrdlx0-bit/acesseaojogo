@@ -69,6 +69,14 @@ export class RuleBasedPlanner implements AIEditingPlanner {
     const removing = has("remov", "tirar", "tire ", "tira ", "sem ", "desativ", "desliga", "nao quero");
 
     // Silêncios / dinamismo
+    const noSound = has(
+      "nao tem som", "sem som", "nao tem audio", "sem audio", "nao tem fala", "sem fala", "ninguem fala", "nao falo",
+      "parte muda", "partes mudas", "fica mudo", "fico calad", "fica calad", "tempo morto", "momentos vazios", "partes vazias",
+    );
+    if (noSound && !autopilot && !has("legenda")) {
+      set("remove_silence", { minSilenceMs: 500, thresholdDb: -35, paddingMs: 100 });
+      actions.push("cortar as partes sem fala");
+    }
     if (has("silencio", "pausa", "respiro") && !autopilot) {
       if (removing || has("cort", "corta")) {
         const long = has("longa", "grande");
@@ -76,7 +84,7 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         actions.push(long ? "remover as pausas longas" : "remover os silêncios");
       }
     }
-    if (has("dinamic", "cortes mais rapidos", "mais ritmo", "agil") && !autopilot) {
+    if (has("dinamic", "cortes mais rapidos", "mais ritmo", "agil", "estrateg", "cortes inteligentes") && !autopilot) {
       set("remove_silence", { minSilenceMs: 400, thresholdDb: -35, paddingMs: 90 });
       const current = get("speed")?.factor ?? 1;
       set("speed", { factor: clamp(Math.max(current, 1) * 1.08, 0.5, 1.5) });
@@ -130,17 +138,44 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         if (has("karaoke", "palavra por palavra")) next.style = "karaoke";
         if (has("simples", "discret", "minimal")) next.style = "minimal";
         if (has("caixa", "fundo")) next.style = "clean";
+        if (has("3d", "3 d", "tridimension", "profundidade", "relevo")) next.style = "3d";
         if (has("amarel")) next.highlightColor = "#FACC15";
         if (has("verde")) next.highlightColor = "#22C55E";
         if (has("vermelh")) next.highlightColor = "#EF4444";
         set("subtitles", next);
-        actions.push(current ? "ajustar as legendas" : `colocar legendas ${next.size === "xl" ? "gigantes" : next.size === "large" ? "grandes" : ""}`.trim());
+        const sizeLabel = next.size === "xl" ? "gigantes" : next.size === "large" ? "grandes" : "";
+        actions.push(
+          current
+            ? next.style === "3d" && current.style !== "3d"
+              ? "deixar as legendas em 3D"
+              : "ajustar as legendas"
+            : `colocar legendas ${next.style === "3d" ? `${sizeLabel} em 3D` : sizeLabel}`.replace(/\s+/g, " ").trim(),
+        );
       }
     }
     if (has("destaq", "palavras importantes", "palavras chave")) {
       const base = (get("subtitles") ?? editingOperationSchema.parse({ type: "subtitles" })) as OperationOf<"subtitles">;
       set("subtitles", { ...base, enabled: true, highlightKeywords: true });
       actions.push("destacar as palavras importantes nas legendas");
+    }
+
+    // Elementos sobre o que a pessoa fala (destaques animados das palavras-chave)
+    if (
+      has("elemento", "pop up", "popup", "emoji", "icone", "destaques animados", "destaque animado", "cards na tela") ||
+      (has("sobre o que", "do que") && has("fala", "falo", "diz", "digo"))
+    ) {
+      if (removing) {
+        drop("keyword_popups");
+        actions.push("remover os destaques animados");
+      } else {
+        const keywords = extractKeywords(text);
+        set("keyword_popups", { keywords, perMinute: 6, position: "top", color: "#FACC15" });
+        actions.push(
+          keywords.length
+            ? `mostrar destaques animados quando você falar “${keywords.join(", ")}”`
+            : "mostrar destaques animados com as palavras-chave do que é dito",
+        );
+      }
     }
 
     // Zoom

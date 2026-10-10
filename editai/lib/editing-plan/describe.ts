@@ -16,7 +16,7 @@ export function describeOperation(op: EditingOperation): string {
     case "shorten":
       return `Versão de ${Math.round(op.targetSeconds)}s`;
     case "subtitles":
-      return op.enabled ? `Legendas ${SIZE_LABEL[op.size]} (${op.style})` : "Sem legendas";
+      return op.enabled ? `Legendas ${SIZE_LABEL[op.size]} (${op.style === "3d" ? "3D" : op.style})` : "Sem legendas";
     case "subtitle_style":
       return "Ajustar estilo das legendas";
     case "audio_enhancement":
@@ -45,6 +45,8 @@ export function describeOperation(op: EditingOperation): string {
       return `Texto: “${op.text}”`;
     case "color_adjustment":
       return op.preset !== "none" ? `Cor: ${op.preset}` : "Ajuste de cor";
+    case "keyword_popups":
+      return op.keywords.length ? `Destaques animados: “${op.keywords.slice(0, 3).join(", ")}”` : "Destaques animados das palavras-chave";
     case "b_roll":
       return "B-roll (em breve)";
   }
