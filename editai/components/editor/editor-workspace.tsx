@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/api/client";
@@ -22,6 +23,9 @@ import { TranscriptViewer } from "./transcript-viewer";
 import { VersionList } from "./version-list";
 import { VideoPreview } from "./video-preview";
 import { VoiceCommandBox } from "./voice-command-box";
+
+// Só no navegador: a transcrição local (Whisper) nunca entra no bundle do servidor.
+const BrowserTranscribeCard = dynamic(() => import("./browser-transcribe-card").then((m) => m.BrowserTranscribeCard), { ssr: false });
 
 /**
  * Editor: preview + timeline + conversa com a IA + versões + exportação.
@@ -48,6 +52,7 @@ export function EditorWorkspace({
     initial.commands.filter((c) => c.status === "planned").at(-1) ?? null,
   );
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [transcribedWords, setTranscribedWords] = useState<number | null>(null);
   const { project, metadata, versions, commands, renders } = detail;
 
   const activeRender = renders.find((r) => r.kind === "edit" && (r.status === "queued" || r.status === "processing"));
@@ -313,11 +318,23 @@ export function EditorWorkspace({
               }}
             />
           )}
-          {!analyzing && metadata?.metadata && !metadata.metadata.transcript && metadata.metadata.hasAudio && (
-            <p className="rounded-2xl border border-border px-4 py-3 text-xs text-muted-foreground">
-              Este vídeo não foi transcrito (nenhum provedor de Speech-to-Text configurado no servidor). Cortes, velocidade, áudio, formato e cor
-              funcionam; legendas e zoom por palavra precisam da transcrição.
-            </p>
+          {!analyzing && metadata?.analysis_status === "completed" && metadata.metadata && !metadata.metadata.transcript && metadata.metadata.hasAudio && (
+            <BrowserTranscribeCard
+              projectId={project.id}
+              duration={metadata.metadata.duration}
+              onDone={(words) => {
+                setTranscribedWords(words);
+                void refresh();
+              }}
+            />
+          )}
+          {transcribedWords !== null && metadata?.metadata?.transcript && (
+            <div className="flex gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+              <p>
+                Transcrição pronta ({transcribedWords} palavras). Agora peça, por exemplo: “coloque legendas 3D e elementos sobre o que eu falo”.
+              </p>
+            </div>
           )}
           <div className="rounded-3xl border border-border bg-card p-5">
             <p className="mb-4 text-xs uppercase tracking-[0.2em] text-muted-foreground">Conversa</p>

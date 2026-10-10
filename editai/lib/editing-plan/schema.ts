@@ -194,7 +194,11 @@ export const keywordPopupsOp = z.object({
   keywords: z.array(z.string().min(1).max(40)).max(30).default([]),
   /** Máximo de destaques por minuto do vídeo final. */
   perMinute: z.number().int().min(1).max(20).default(6),
-  position: z.enum(["top", "center"]).default("top"),
+  /** auto = entre o rosto e a legenda (vertical) ou nos cantos de cima (horizontal). */
+  position: z.enum(["auto", "top", "center"]).default("auto"),
+  /** light = cartão branco com ícone colorido; accent = cartão na cor `color`. */
+  theme: z.enum(["light", "accent"]).default("light"),
+  icons: z.boolean().default(true),
   color: hexColor.default("#FACC15"),
 });
 

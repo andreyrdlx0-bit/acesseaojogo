@@ -37,7 +37,7 @@ Operações disponíveis (campos opcionais têm padrão):
 - {"type":"transitions","style":"fade","durationMs":400}
 - {"type":"text_overlay","text":"...","start":0,"end":3,"position":"top","size":"large"}
 - {"type":"color_adjustment","preset":"none"|"vivid"|"warm"|"cool"|"bw"|"cinematic","brightness":0,"contrast":1,"saturation":1}
-- {"type":"keyword_popups","keywords":[],"perMinute":6,"position":"top"|"center","color":"#FACC15"}  destaques animados (cards) com as palavras-chave da fala, sincronizados com o momento em que são ditas. keywords vazio = escolha automática. "elementos/coisas sobre o que eu falo", "pop-ups", "destaques na tela" => keyword_popups.
+- {"type":"keyword_popups","keywords":[],"perMinute":6,"position":"auto"|"top"|"center","theme":"light"|"accent","icons":true,"color":"#FACC15"}  destaques animados (cards com ícone) com as palavras-chave da fala, sincronizados com o momento em que são ditas. keywords vazio = escolha automática (números, valores e palavras de impacto); preencha só se o usuário citar palavras. theme "accent" = cartão na cor "color". "elementos/coisas sobre o que eu falo", "pop-ups", "destaques na tela", "emojis/ícones" => keyword_popups.
 - {"type":"b_roll","prompts":["..."]}  (em breve; use só se pedirem explicitamente)
 
 Interpretações úteis:

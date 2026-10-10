@@ -6,12 +6,30 @@ import type { TranscriptWord } from "@/types/video";
 import { normalizeText } from "@/utils/text";
 import { SUBTITLE_FONT_FAMILY } from "../fonts";
 import { assColor, assFilter, assHeader, dialogue, escapeAssText } from "./ass";
-import type { OperationProcessor } from "./types";
+import { build3dSubtitleEvents, subtitle3dBand, subtitle3dStyle, type Subtitle3DOptions } from "./subtitle-3d";
+import { chunkWords, SUBTITLE_SIZE_FACTOR, type VerticalBand } from "./subtitle-layout";
+import type { OperationProcessor, ProcessorContext } from "./types";
 
 type SubtitleOp = OperationOf<"subtitles">;
 
-/** Altura da fonte como fração da altura do vídeo. */
-const SIZE_FACTOR = { small: 0.035, medium: 0.045, large: 0.06, xl: 0.078 } as const;
+/**
+ * Aviso quando falta a transcrição (legendas, destaques e zoom por palavra
+ * dependem dela). `subject` completa a frase: "As legendas precisam".
+ */
+export function missingTranscriptWarning(ctx: ProcessorContext, subject: string): string {
+  if (!ctx.metadata.hasAudio) return "O vídeo não tem áudio, então não há fala para legendar ou destacar.";
+  if (ctx.metadata.transcript) return "Não encontramos fala na transcrição deste vídeo.";
+  return `${subject} da transcrição do vídeo. No editor, use “Transcrever no navegador (grátis)” e peça de novo.`;
+}
+
+/**
+ * Modo econômico da legenda 3D: em vídeos longos ou em 1080p o filtro de
+ * legendas (single-thread) pesa mais, então o karaokê só troca a cor.
+ */
+export function subtitleEconomy(ctx: ProcessorContext): boolean {
+  return ctx.options.quality === "1080p" || ctx.timeline.outputDuration > 300;
+}
+
 const STOPWORDS = new Set(
   "a o as os um uma de da do das dos e em no na nos nas que para por com sem se eu voce ele ela isso esse essa este esta mas mais muito tambem como entao porque pra pro ja vai vou ser ter tem foi era sao nao sim aqui ali la meu minha seu sua".split(
     " ",
@@ -29,14 +47,10 @@ export const SubtitleProcessor: OperationProcessor = {
     const op = findOperation(ctx.plan, "subtitles");
     if (!op) return;
     if (!ctx.words.length) {
-      ctx.warnings.push(
-        ctx.metadata.hasAudio
-          ? "As legendas precisam da transcrição do vídeo. Configure um provedor de Speech-to-Text para habilitá-las."
-          : "O vídeo não tem áudio, então não há fala para legendar.",
-      );
+      ctx.warnings.push(missingTranscriptWarning(ctx, "As legendas precisam"));
       return;
     }
-    const ass = buildAss(ctx.words, op, ctx.frame.width, ctx.frame.height);
+    const ass = buildAss(ctx.words, op, ctx.frame.width, ctx.frame.height, subtitleEconomy(ctx));
     const file = path.join(ctx.workDir, "subtitles.ass");
     await writeFile(file, ass, "utf8");
     ctx.files.set("subtitles", file);
@@ -44,8 +58,24 @@ export const SubtitleProcessor: OperationProcessor = {
   },
 };
 
-export function buildAss(words: TranscriptWord[], op: SubtitleOp, width: number, height: number): string {
-  const fontSize = Math.round(height * SIZE_FACTOR[op.size] * (width < height ? 1 : 0.9));
+export function subtitle3dOptions(op: SubtitleOp, economy: boolean): Subtitle3DOptions {
+  return {
+    position: op.position,
+    size: op.size,
+    color: op.color,
+    highlightColor: op.highlightColor,
+    maxWordsPerLine: op.maxWordsPerLine,
+    economy,
+  };
+}
+
+export function buildAss(words: TranscriptWord[], op: SubtitleOp, width: number, height: number, economy = false): string {
+  if (op.style === "3d") {
+    const o = subtitle3dOptions(op, economy);
+    const header = assHeader(width, height, [subtitle3dStyle(width, height, o, SUBTITLE_FONT_FAMILY)]);
+    return [...header, ...build3dSubtitleEvents(words, o, width, height), ""].join("\n");
+  }
+  const fontSize = classicFontSize(op, width, height);
   const alignment = op.position === "top" ? 8 : op.position === "center" ? 5 : 2;
   const marginV = Math.round(height * (op.position === "center" ? 0 : 0.12));
   const outline = op.style === "minimal" ? 0 : Math.max(2, Math.round(fontSize * 0.08));
@@ -78,21 +108,26 @@ export function buildAss(words: TranscriptWord[], op: SubtitleOp, width: number,
   return [...header, ...events, ""].join("\n");
 }
 
-function chunkWords(words: TranscriptWord[], max: number): TranscriptWord[][] {
-  const chunks: TranscriptWord[][] = [];
-  let current: TranscriptWord[] = [];
-  for (const w of words) {
-    const prev = current[current.length - 1];
-    const gap = prev ? w.start - prev.end : 0;
-    const endsSentence = prev ? /[.!?]$/.test(prev.word) : false;
-    if (current.length >= max || gap > 0.6 || endsSentence) {
-      if (current.length) chunks.push(current);
-      current = [];
-    }
-    current.push(w);
+function classicFontSize(op: SubtitleOp, width: number, height: number): number {
+  return Math.round(height * SUBTITLE_SIZE_FACTOR[op.size] * (width < height ? 1 : 0.9));
+}
+
+/**
+ * Faixa vertical que a legenda pode ocupar (até 2 linhas), para os destaques
+ * animados não caírem em cima dela.
+ */
+export function subtitleBand(op: SubtitleOp, width: number, height: number, economy = false): VerticalBand {
+  if (op.style === "3d") return subtitle3dBand(width, height, subtitle3dOptions(op, economy));
+  const fontSize = classicFontSize(op, width, height);
+  const outline = op.style === "minimal" ? 0 : Math.max(2, Math.round(fontSize * 0.08));
+  const blockH = 2 * fontSize * 1.05 + 2 * outline + 4;
+  if (op.position === "top") {
+    const top = Math.round(height * 0.12);
+    return { top: top - outline, bottom: Math.round(top + blockH) };
   }
-  if (current.length) chunks.push(current);
-  return chunks;
+  if (op.position === "center") return { top: Math.round(height / 2 - blockH / 2), bottom: Math.round(height / 2 + blockH / 2) };
+  const bottom = Math.round(height * 0.88);
+  return { top: Math.round(bottom - blockH), bottom: bottom + outline };
 }
 
 function styleWord(word: string, op: SubtitleOp, highlight: boolean): string {

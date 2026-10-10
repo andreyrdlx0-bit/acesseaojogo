@@ -11,6 +11,31 @@ export function assColor(hex: string): string {
   return `&H00${b}${g}${r}`.toUpperCase();
 }
 
+/** #RRGGBB -> &HBBGGRR& (cores em override tags: \1c, \3c, \4c). */
+export function tagColor(hex: string): string {
+  return `&H${hex.slice(5, 7)}${hex.slice(3, 5)}${hex.slice(1, 3)}&`.toUpperCase();
+}
+
+/** Mistura duas cores #RRGGBB (t = 0 -> a, 1 -> b). */
+export function mixColor(a: string, b: string, t: number): string {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  return `#${ca.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (cb[i]! - v) * t))).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+}
+
+/** Luminância relativa (0 = preto, 1 = branco), para escolher texto claro ou escuro. */
+export function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
 export function assTime(t: number): string {
   const cs = Math.max(0, Math.round(t * 100));
   const h = Math.floor(cs / 360000);
@@ -36,6 +61,8 @@ export function assHeader(width: number, height: number, styles: string[]): stri
     `PlayResY: ${height}`,
     "WrapStyle: 0",
     "ScaledBorderAndShadow: yes",
+    // Sem isso o libass não aplica kerning ("ESTRA TÉGIA").
+    "Kerning: yes",
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",

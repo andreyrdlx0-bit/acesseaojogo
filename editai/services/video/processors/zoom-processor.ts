@@ -3,6 +3,7 @@ import type { TimeRange } from "@/types/video";
 import { normalizeText } from "@/utils/text";
 import { normalizeRanges } from "../ranges";
 import { sourceToOutput } from "../timeline";
+import { missingTranscriptWarning } from "./subtitle-processor";
 import { even, type OperationProcessor, type ProcessorContext } from "./types";
 
 const RAMP = 0.25; // segundos de entrada/saída suave do zoom
@@ -26,7 +27,7 @@ export const ZoomProcessor: OperationProcessor = {
       const starts: number[] = [];
       if (op.trigger.kind === "keyword") {
         if (!ctx.words.length) {
-          ctx.warnings.push("Zoom por palavra precisa da transcrição do vídeo, que não está disponível.");
+          ctx.warnings.push(missingTranscriptWarning(ctx, "O zoom por palavra precisa"));
           continue;
         }
         const keys = op.trigger.keywords.map(normalizeText).filter(Boolean);

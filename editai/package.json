@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
+    "@huggingface/transformers": "4.3.0",
     "@radix-ui/react-dialog": "^1.2.0",
     "@radix-ui/react-progress": "^1.1.17",
     "@radix-ui/react-slot": "^1.4.0",

@@ -8,6 +8,17 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/jobs/run": ["./node_modules/ffmpeg-static/ffmpeg", "./assets/fonts/**/*"],
   },
+  // A transcrição no navegador (transformers.js) só roda no cliente; nada dela
+  // pode ir para as funções do servidor (o onnxruntime-node tem 288 MB).
+  outputFileTracingExcludes: {
+    "*": ["./node_modules/onnxruntime-node/**", "./node_modules/onnxruntime-web/**", "./node_modules/@huggingface/**"],
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.alias = { ...config.resolve.alias, "onnxruntime-node$": false, sharp$: false };
+    }
+    return config;
+  },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
   },

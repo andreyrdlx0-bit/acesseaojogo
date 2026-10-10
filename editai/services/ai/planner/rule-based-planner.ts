@@ -169,7 +169,15 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         actions.push("remover os destaques animados");
       } else {
         const keywords = extractKeywords(text);
-        set("keyword_popups", { keywords, perMinute: 6, position: "top", color: "#FACC15" });
+        const prev = get("keyword_popups");
+        set("keyword_popups", {
+          keywords: keywords.length ? keywords : (prev?.keywords ?? []),
+          perMinute: prev?.perMinute ?? 6,
+          position: prev?.position ?? "auto",
+          theme: prev?.theme ?? "light",
+          icons: prev?.icons ?? true,
+          color: prev?.color ?? "#FACC15",
+        });
         actions.push(
           keywords.length
             ? `mostrar destaques animados quando você falar “${keywords.join(", ")}”`

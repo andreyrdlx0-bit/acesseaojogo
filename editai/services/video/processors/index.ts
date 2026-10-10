@@ -2,6 +2,7 @@ import { AudioProcessor } from "./audio-processor";
 import { BRollProcessor } from "./broll-processor";
 import { ColorProcessor } from "./color-processor";
 import { CropProcessor, ScaleProcessor } from "./crop-processor";
+import { KeywordPopupProcessor } from "./keyword-popup-processor";
 import { MusicProcessor } from "./music-processor";
 import { SegmentProcessor } from "./segment-processor";
 import { SpeedProcessor } from "./speed-processor";
@@ -13,7 +14,8 @@ import { ZoomProcessor } from "./zoom-processor";
 
 /**
  * Ordem do pipeline. Cortes e velocidade primeiro (definem o tempo final),
- * depois enquadramento, zoom, escala, cor, legendas, textos e transições.
+ * depois enquadramento, zoom, escala, cor, legendas, destaques animados,
+ * textos e transições.
  */
 export const PROCESSOR_PIPELINE: readonly OperationProcessor[] = [
   SegmentProcessor,
@@ -23,6 +25,7 @@ export const PROCESSOR_PIPELINE: readonly OperationProcessor[] = [
   ScaleProcessor,
   ColorProcessor,
   SubtitleProcessor,
+  KeywordPopupProcessor,
   TextOverlayProcessor,
   AudioProcessor,
   MusicProcessor,
