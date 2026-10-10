@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { estimateRenderCredits } from "@/config/credits";
-import { EMPTY_PLAN, editingOperationSchema, validateEditingPlan, withoutTranscriptOps, type EditingPlan, type OperationOf } from "@/lib/editing-plan";
+import {
+  EMPTY_PLAN,
+  editingOperationSchema,
+  isMissingTranscriptWarning,
+  validateEditingPlan,
+  withoutTranscriptOps,
+  type EditingPlan,
+  type OperationOf,
+} from "@/lib/editing-plan";
 import { cleanPieceWords } from "@/lib/transcription/segmenter";
 import { RuleBasedPlanner } from "@/services/ai/planner/rule-based-planner";
 import { buildBrowserTranscript } from "@/services/projects/transcript-service";
@@ -166,5 +174,104 @@ describe("planejador: frases do dia a dia", () => {
     expect(await run("deixe as legendas normais", sub3d)).toMatchObject([{ type: "subtitles", style: "bold" }]);
     const auto = await run("deixe o vídeo mais interessante com legendas 3D");
     expect(auto.find((o) => o.type === "subtitles")).toMatchObject({ style: "3d" });
+  });
+});
+
+describe("segunda verificação", () => {
+  const planner = new RuleBasedPlanner();
+  const video = {
+    duration: 60, width: 1080, height: 1920, fps: 30, hasAudio: true, silenceCount: 4, silenceSeconds: 6,
+    hasTranscript: true, transcriptText: null, musicAssets: [],
+  };
+  const P = (...ops: Record<string, unknown>[]): EditingPlan => ({ version: 1, operations: ops.map((o) => editingOperationSchema.parse(o)) });
+  const run = async (instruction: string, currentPlan: EditingPlan = EMPTY_PLAN) =>
+    (await planner.createEditingPlan({ instruction, currentPlan, video, mode: "edit", history: [] })).plan.operations;
+  const pop = { type: "keyword_popups" };
+  const sub = { type: "subtitles" };
+
+  it("“sem pop ups / sem emojis” removem os destaques, nunca adicionam", async () => {
+    for (const phrase of ["quero o vídeo sem pop ups", "sem destaques animados, por favor", "deixe sem emojis"]) {
+      expect(await run(phrase, P(pop))).toEqual([]);
+      expect((await run(phrase)).some((o) => o.type === "keyword_popups")).toBe(false);
+    }
+    expect((await run("legendas simples, sem emoji")).map((o) => o.type)).toEqual(["subtitles"]);
+  });
+
+  it("“tire os ícones dos destaques” só tira os ícones", async () => {
+    expect(await run("tire os ícones dos destaques", P(pop))).toMatchObject([{ type: "keyword_popups", icons: false }]);
+  });
+
+  it("tirar o destaque das legendas mantém as legendas; “remova os destaques” tira os cards", async () => {
+    expect(await run("tire o destaque das legendas", P(sub))).toMatchObject([{ type: "subtitles", highlightKeywords: false }]);
+    expect(await run("deixe as legendas sem destaque", P(sub))).toMatchObject([{ type: "subtitles", highlightKeywords: false }]);
+    expect(await run("remova os destaques", P(pop))).toEqual([]);
+  });
+
+  it("“tamanho normal” não muda o estilo; “tire o 3d” sozinho funciona", async () => {
+    expect(await run("volte as legendas para o tamanho normal", P({ type: "subtitles", style: "3d", size: "xl" }))).toMatchObject([
+      { type: "subtitles", style: "3d", size: "large" },
+    ]);
+    expect(await run("tire o 3d", P({ type: "subtitles", style: "3d" }))).toMatchObject([{ type: "subtitles", style: "bold" }]);
+    expect(await run("coloque legendas sem 3d", P(sub))).toMatchObject([{ type: "subtitles", style: "bold" }]);
+  });
+
+  it("piloto automático: “3 dicas” e “sem legenda 3d” não ligam o 3D", async () => {
+    for (const phrase of ["deixe o vídeo viral, são 3 dicas de vendas", "deixe o vídeo mais interessante, mas sem legenda 3d"]) {
+      expect((await run(phrase)).find((o) => o.type === "subtitles")).toMatchObject({ style: "karaoke" });
+    }
+  });
+
+  it("silêncio + ruído na mesma frase faz as duas coisas; verbos comuns funcionam", async () => {
+    expect((await run("remova as partes sem fala e o ruído")).map((o) => o.type).sort()).toEqual(["noise_reduction", "remove_silence"]);
+    for (const phrase of ["apague quando ninguém fala", "exclua os pedaços sem áudio", "pule quando eu fico calado"]) {
+      expect((await run(phrase)).map((o) => o.type)).toEqual(["remove_silence"]);
+    }
+  });
+
+  it("palavras pedidas sobrevivem a posição/escopo; “palavras-chave” é escolha automática", async () => {
+    expect(await run("coloque emojis quando eu falar de dinheiro em cima da tela")).toMatchObject([
+      { type: "keyword_popups", keywords: ["dinheiro"], position: "top" },
+    ]);
+    expect(await run("coloque destaques animados nas palavras-chave")).toMatchObject([{ type: "keyword_popups", keywords: [] }]);
+    const [zoom] = await run("faça zoom quando alguém falar dinheiro");
+    expect(zoom?.type === "zoom" && zoom.trigger.kind).toBe("keyword");
+  });
+});
+
+describe("segunda verificação: servidor e motor", () => {
+  it("operações idênticas às da versão de partida não são retiradas; desligadas não contam", () => {
+    const base = validateEditingPlan({ operations: [{ type: "remove_silence" }, { type: "subtitles" }] }).plan;
+    const same = withoutTranscriptOps(base, base);
+    expect(same.rejected).toEqual([]);
+    const disabled = validateEditingPlan({ operations: [{ type: "subtitles", enabled: false }] }).plan;
+    expect(withoutTranscriptOps(disabled).rejected).toEqual([]);
+    const newer = validateEditingPlan({ operations: [{ type: "remove_silence" }, { type: "subtitles", style: "3d" }] }).plan;
+    expect(withoutTranscriptOps(newer, base).rejected.map((r) => r.type)).toEqual(["subtitles"]);
+  });
+
+  it("só o aviso de render sem transcrição libera repetir o mesmo plano", () => {
+    expect(isMissingTranscriptWarning("As legendas precisam da transcrição do vídeo. No editor, use “Transcrever no navegador (grátis)” e peça de novo.")).toBe(true);
+    expect(isMissingTranscriptWarning("Zoom por palavra precisa da transcrição do vídeo, que não está disponível.")).toBe(true);
+    expect(isMissingTranscriptWarning("Não encontramos fala na transcrição deste vídeo.")).toBe(false);
+  });
+
+  it("despedida curta e real no último pedaço fica; alucinação em pedaço quase sem fala sai", () => {
+    const words = "Valeu por assistir, até a próxima!".split(" ").map((w, i) => ({ word: w, start: i * 0.4, end: i * 0.4 + 0.3 }));
+    expect(cleanPieceWords(words, 3.5, 2.4).words).toHaveLength(words.length);
+    expect(cleanPieceWords(words, 3.5, 0.5).words).toEqual([]);
+  });
+
+  it("bloco 3D curto demais não some: ganha duração mínima e o próximo vem depois", () => {
+    const words = [
+      { word: "Sim.", start: 2.0, end: 2.2 },
+      { word: "Então", start: 2.0, end: 2.3 },
+      { word: "vamos", start: 2.4, end: 2.7 },
+    ];
+    const ev = events(["", ...build3dSubtitleEvents(words, { position: "bottom", size: "large", color: "#FFFFFF", highlightColor: "#FACC15", maxWordsPerLine: 3 }, 720, 1280)].join("\n"));
+    const faces = ev.filter((e) => e.startsWith("Dialogue: 4,"));
+    expect(faces).toHaveLength(2);
+    expect(faces[0]).toContain("SIM.");
+    const times = faces.map((e) => e.split(",").slice(1, 3).map(toSec) as [number, number]);
+    expect(times[1]![0]).toBeGreaterThanOrEqual(times[0]![1]);
   });
 });

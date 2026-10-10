@@ -13,6 +13,7 @@ export function TranscriptViewer({
   command,
   balance,
   basePlan,
+  baseMissedTranscript = false,
   onConfirmed,
   onDiscarded,
 }: {
@@ -20,13 +21,15 @@ export function TranscriptViewer({
   balance: number;
   /** Plano da versão de partida: se o novo plano for igual, não há o que renderizar. */
   basePlan: EditingPlan | null;
+  /** A versão de partida saiu sem a transcrição que agora existe: o mesmo plano muda o vídeo. */
+  baseMissedTranscript?: boolean;
   onConfirmed: (render: Render) => void;
   onDiscarded: () => void;
 }) {
   const [pending, setPending] = useState<"confirm" | "discard" | null>(null);
   const [error, setError] = useState<{ message: string; credits?: boolean } | null>(null);
   const ops = command.editing_plan.operations;
-  const unchanged = basePlan ? plansEqual(command.editing_plan, basePlan) : ops.length === 0;
+  const unchanged = basePlan ? plansEqual(command.editing_plan, basePlan) && !baseMissedTranscript : ops.length === 0;
   const insufficient = !unchanged && balance < command.estimated_credits;
   // Itens que ficaram de fora por falta de transcrição já são explicados na resposta.
   const invalid = command.rejected_operations.filter((r) => r.reason !== TRANSCRIPT_REQUIRED_REASON);

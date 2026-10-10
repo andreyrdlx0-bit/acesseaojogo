@@ -4,7 +4,7 @@ import { AUDIO_MIME_TYPES, baseMime, MAX_AUDIO_COMMAND_MB, MAX_INSTRUCTION_CHARS
 import {
   EMPTY_PLAN,
   describePlan,
-  needsTranscript,
+  isMissingTranscriptWarning,
   normalizeEditingPlan,
   plansEqual,
   withoutTranscriptOps,
@@ -171,19 +171,13 @@ export async function createEditingCommand(input: CreateCommandInput): Promise<E
   let rejected = result.rejected;
   let reply = result.reply;
   if (!video.hasTranscript) {
-    const stripped = withoutTranscriptOps(plan);
+    const stripped = withoutTranscriptOps(plan, basePlan);
     if (stripped.rejected.length) {
-      const removed = plan.operations.filter(needsTranscript);
-      const askedNow = removed.some(
-        (op) => !basePlan.operations.some((b) => b.type === op.type && plansEqual({ version: 1, operations: [b] }, { version: 1, operations: [op] })),
-      );
       plan = stripped.plan;
       rejected = [...rejected, ...stripped.rejected];
-      if (askedNow) {
-        reply += video.hasAudio
-          ? " Legendas, destaques animados, zoom por palavra e corte de erros precisam da transcrição: use “Transcrever no navegador (grátis)” no editor e peça de novo."
-          : " Como o vídeo não tem áudio, não dá para fazer legendas, destaques ou zoom por palavra.";
-      }
+      reply += video.hasAudio
+        ? " Legendas, destaques animados, zoom por palavra e corte de erros precisam da transcrição: use “Transcrever no navegador (grátis)” no editor e peça de novo."
+        : " Como o vídeo não tem áudio, não dá para fazer legendas, destaques ou zoom por palavra.";
     }
   }
 
@@ -270,7 +264,7 @@ async function baseMissedTranscript(projectId: string, baseVersionId: string): P
   ]);
   const metadata = (meta?.metadata ?? null) as VideoMetadataRow["metadata"];
   if (!metadata?.transcript?.words.length) return false;
-  return (renders ?? []).some((r) => ((r.warnings as string[] | null) ?? []).some((w) => /transcri/i.test(w)));
+  return (renders ?? []).some((r) => ((r.warnings as string[] | null) ?? []).some(isMissingTranscriptWarning));
 }
 
 export async function discardEditingCommand(userId: string, commandId: string) {

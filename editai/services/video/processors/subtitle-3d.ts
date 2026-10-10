@@ -36,6 +36,8 @@ export interface Subtitle3DOptions {
 const DEFAULT_EXTRUDE = "#7C3AED";
 const MAX_LAYERS = 4;
 const KARAOKE_SCALE = 112;
+/** Menor tempo (s) que um bloco fica na tela. */
+const MIN_CHUNK = 0.25;
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -179,14 +181,16 @@ export function build3dSubtitleEvents(words: TranscriptWord[], o: Subtitle3DOpti
   const persp = `\\frx${p.frx}\\fax${p.fax}`;
   const chunks = chunkWords(words, Math.min(o.maxWordsPerLine, 3));
   const events: string[] = [];
+  // Blocos em sequência, sem sobreposição: as camadas têm \pos fixo e o libass não
+  // empurra uma legenda para longe da outra. Bloco curto demais (palavras do Whisper com
+  // o mesmo início) ganha uma duração mínima e o próximo começa logo depois.
+  let cursor = 0;
   chunks.forEach((chunk, ci) => {
-    const start = chunk[0]!.start;
+    const start = Math.max(chunk[0]!.start, cursor);
     const lastEnd = chunk[chunk.length - 1]!.end;
     const next = chunks[ci + 1]?.[0]?.start ?? Infinity;
-    // Nunca passa do início do próximo bloco: as camadas têm \pos fixo e o libass não
-    // empurra uma legenda para longe da outra (os dois blocos se misturariam na tela).
-    const end = Math.min(next, lastEnd + 0.3);
-    if (end - start < 0.04) return;
+    const end = Math.max(start + MIN_CHUNK, Math.min(next, lastEnd + 0.3));
+    cursor = end;
     const layout = layoutChunk(chunk, p.fontSize, W - 2 * p.marginLR, o.economy ? 100 : KARAOKE_SCALE);
     // \q2: sem quebra automática (a quebra já veio do layoutChunk). Sem \fad de
     // propósito: camadas translúcidas sobrepostas "lavam" a face.

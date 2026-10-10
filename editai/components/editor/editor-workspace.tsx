@@ -11,7 +11,7 @@ import { ProjectStatusBadge } from "@/components/project/status-badge";
 import { VideoUploader } from "@/components/project/video-uploader";
 import { Button } from "@/components/ui/button";
 import { usePolling } from "@/hooks/use-polling";
-import { describePlan } from "@/lib/editing-plan";
+import { describePlan, isMissingTranscriptWarning } from "@/lib/editing-plan";
 import type { ProjectDetail } from "@/services/projects/project-service";
 import type { EditingCommand, ExportQuality, Render } from "@/types/domain";
 import { formatBytes, formatDuration } from "@/utils/format";
@@ -61,7 +61,7 @@ export function EditorWorkspace({
   const hasTranscript = Boolean(metadata?.metadata?.transcript?.words.length);
   // Versão renderizada antes da transcrição existir: o mesmo plano agora sai com legendas/destaques.
   const missedTranscript = (versionId: string | null) =>
-    hasTranscript && renders.some((r) => r.version_id === versionId && r.kind === "edit" && r.warnings.some((w) => /transcri/i.test(w)));
+    hasTranscript && renders.some((r) => r.version_id === versionId && r.kind === "edit" && r.warnings.some(isMissingTranscriptWarning));
 
   // Quando as URLs assinadas (válidas por 1h) foram geradas pela última vez.
   // Vem do servidor: voltar/avançar no navegador remonta o editor com dados em
@@ -304,11 +304,8 @@ export function EditorWorkspace({
             <TranscriptViewer
               command={pendingCommand}
               balance={balance}
-              basePlan={
-                missedTranscript(pendingCommand.base_version_id)
-                  ? null
-                  : (versions.find((v) => v.id === pendingCommand.base_version_id)?.editing_plan ?? null)
-              }
+              basePlan={versions.find((v) => v.id === pendingCommand.base_version_id)?.editing_plan ?? null}
+              baseMissedTranscript={missedTranscript(pendingCommand.base_version_id)}
               onConfirmed={onRenderStarted}
               onDiscarded={() => {
                 setPendingCommand(null);

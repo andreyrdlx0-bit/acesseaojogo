@@ -55,7 +55,7 @@ export class RuleBasedPlanner implements AIEditingPlanner {
       set("remove_silence", { minSilenceMs: 400, thresholdDb: -35, paddingMs: 100 });
       set("remove_retakes", { removeFillers: true });
       // Pedido (ou já escolhido) de legenda 3D vale também no piloto automático.
-      const style = has("3d", "3 d", "tridimension", "relevo") || get("subtitles")?.style === "3d" ? "3d" : "karaoke";
+      const style = !negates3d(text) && (wants3d(text) || get("subtitles")?.style === "3d") ? "3d" : "karaoke";
       set("subtitles", { ...(get("subtitles") ?? {}), enabled: true, style, size: "large", position: "center", uppercase: true } as never);
       set("audio_enhancement", { preset: "voice" });
       if (!get("speed")) set("speed", { factor: 1.1 });
@@ -82,8 +82,8 @@ export class RuleBasedPlanner implements AIEditingPlanner {
       noSound &&
       !autopilot &&
       !has("legenda") &&
-      has("cort", "remov", "tir", "onde", "aonde", "parte", "trecho", "momento", "tempo morto") &&
-      !has("de fundo", "ambiente", "ruido", "chiado", "barulho", "musica")
+      has("cort", "remov", "tir", "apag", "exclu", "elimin", "pul", "onde", "aonde", "quando", "parte", "trecho", "pedac", "momento", "tempo morto") &&
+      !/sem (?:som|audio|barulho|ruido) (?:de fundo|ambiente)/.test(text)
     ) {
       set("remove_silence", { minSilenceMs: 500, thresholdDb: -35, paddingMs: 100 });
       actions.push("cortar as partes sem fala");
@@ -126,14 +126,20 @@ export class RuleBasedPlanner implements AIEditingPlanner {
       actions.push("voltar à velocidade normal");
     }
 
-    // Legendas
-    if (has("legenda") && !autopilot) {
+    // "tire o 3D" (com ou sem a palavra legenda) mantém as legendas no estilo normal.
+    const subs3d = get("subtitles");
+    const drop3d = subs3d?.style === "3d" && negates3d(text);
+    if (drop3d && !autopilot) {
+      set("subtitles", { ...subs3d, style: "bold" });
+      actions.push("tirar o efeito 3D das legendas");
+    }
+
+    // Legendas ("tire o destaque das legendas" fica para o ramo de destaque abaixo)
+    const highlightWords = has("destaq", "palavras importantes", "palavras chave");
+    if (has("legenda") && !autopilot && !drop3d && !(removing && highlightWords)) {
       const current = get("subtitles");
-      if (removing && current?.style === "3d" && has("3d", "3 d", "relevo", "profundidade", "efeito")) {
-        // "tire o 3D" mantém as legendas, só volta ao estilo normal.
-        set("subtitles", { ...current, style: "bold" });
-        actions.push("tirar o efeito 3D das legendas");
-      } else if (removing) {
+      // "legendas sem 3D" nega só o efeito, não as legendas.
+      if (removing && !negates3d(text)) {
         drop("subtitles");
         drop("subtitle_style");
         actions.push("remover as legendas");
@@ -146,15 +152,19 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         else if (has("gigante", "enorme")) next.size = "xl";
         else if (has("grande")) next.size = "large";
         else if (has("pequen")) next.size = "small";
+        else if (has("tamanho normal", "tamanho padrao", "tamanho comum")) next.size = "large";
         if (has("em cima", "no topo", "parte de cima")) next.position = "top";
         if (has("no meio", "centro", "centraliz")) next.position = "center";
         if (has("embaixo", "em baixo", "parte de baixo", "rodape")) next.position = "bottom";
         if (has("maiuscul", "caixa alta")) next.uppercase = true;
+        // "legendas normais" volta ao estilo padrão; "tamanho normal" não mexe no estilo.
+        if (/legendas? (?:mais )?(?:normais?|comuns?|padrao)\b|(?:ao|pro|para o) normal\b|estilo (?:normal|padrao)/.test(text) && !has("tamanho", "cor ", "fonte")) {
+          next.style = "bold";
+        }
         if (has("karaoke", "palavra por palavra")) next.style = "karaoke";
         if (has("simples", "discret", "minimal")) next.style = "minimal";
         if (has("caixa", "fundo")) next.style = "clean";
-        if (has("normal", "normais", "comum", "comuns", "padrao")) next.style = "bold";
-        if (has("3d", "3 d", "tridimension", "profundidade", "relevo")) next.style = "3d";
+        if ((wants3d(text) || has("profundidade")) && !negates3d(text)) next.style = "3d";
         if (has("amarel")) next.highlightColor = "#FACC15";
         if (has("verde")) next.highlightColor = "#22C55E";
         if (has("vermelh")) next.highlightColor = "#EF4444";
@@ -169,19 +179,28 @@ export class RuleBasedPlanner implements AIEditingPlanner {
         );
       }
     }
+
     // Destaques animados (cards na tela) têm prioridade sobre o destaque de palavras na legenda.
+    // "sem pop ups", "sem emojis": o substantivo negado não conta como pedido de cards.
+    const negatedPopups = NEGATED_POPUPS.test(text);
+    const positive = text.replace(new RegExp(NEGATED_POPUPS.source, "g"), " ");
+    const hasPositive = (...words: string[]) => words.some((w) => positive.includes(w));
+    const popupNoun = hasPositive("elemento", "pop up", "popup", "emoji", "icone", "destaques animados", "destaque animado", "cards na tela");
     const popupWords =
-      has("elemento", "pop up", "popup", "emoji", "icone", "destaques animados", "destaque animado", "cards na tela") ||
+      popupNoun ||
       (/(?:^| )(?:sobre o que|do que) (?:eu |ela |ele |a pessoa |voce )?(?:fala|falo|diz|digo|esta falando|estou falando)\b/.test(text) &&
         !has("legenda", "musica", "trilha", "zoom", "volume")) ||
       // "mostre um destaque quando eu falar dinheiro" = cartão na tela, não cor na legenda.
-      (has("destaq") && !has("legenda") && /quando (?:eu )?(?:falar|disser|mencionar|citar)\b/.test(text));
-    if (has("destaq", "palavras importantes", "palavras chave") && !popupWords) {
+      (has("destaq") && !has("legenda") && /quando (?:\p{L}+ )?(?:falar|disser|mencionar|citar)\b/u.test(text));
+    if (highlightWords && !popupWords && !negatedPopups) {
       const subs = get("subtitles");
       if (removing) {
         if (subs?.highlightKeywords) {
           set("subtitles", { ...subs, highlightKeywords: false });
           actions.push("tirar o destaque das palavras nas legendas");
+        } else if (get("keyword_popups")) {
+          drop("keyword_popups");
+          actions.push("remover os destaques animados");
         }
       } else {
         const base = (subs ?? editingOperationSchema.parse({ type: "subtitles" })) as OperationOf<"subtitles">;
@@ -191,28 +210,40 @@ export class RuleBasedPlanner implements AIEditingPlanner {
     }
 
     // Elementos sobre o que a pessoa fala (destaques animados das palavras-chave)
-    if (popupWords) {
-      // "sem exagero", "sem ícones" não são pedidos de remoção.
-      const removePopups =
-        has("remov", "tirar", "tire ", "tira ", "desativ", "desliga", "nao quero") && !has("coloq", "adicion", "poe ", "bot", "acrescent");
+    const prevPopups = get("keyword_popups");
+    const iconWords = has("icone", "emoji");
+    const cardWords = has("destaq", "pop up", "popup", "elemento", "card");
+    const removeVerb = has("remov", "tirar", "tire ", "tira ", "desativ", "desliga", "nao quero");
+    if (prevPopups && iconWords && cardWords && (removeVerb || /sem (?:os |as )?(?:icones?|emojis?)/.test(text))) {
+      // "tire os ícones dos destaques": só os ícones saem.
+      set("keyword_popups", { ...prevPopups, icons: false });
+      actions.push("tirar os ícones dos destaques animados");
+    } else if (negatedPopups && !popupNoun) {
+      // "deixe sem pop ups", "legendas simples, sem emoji".
+      if (prevPopups) {
+        drop("keyword_popups");
+        actions.push("remover os destaques animados");
+      }
+    } else if (popupWords) {
+      // "sem exagero" não é pedido de remoção.
+      const removePopups = removeVerb && !has("coloq", "adicion", "poe ", "bot", "acrescent");
       if (removePopups) {
         drop("keyword_popups");
         actions.push("remover os destaques animados");
       } else {
         const keywords = extractSpokenKeywords(text);
-        const prev = get("keyword_popups");
         const position = has("em cima", "no topo", "parte de cima")
           ? "top"
           : has("no centro", "no meio", "centraliz")
             ? "center"
-            : (prev?.position ?? "auto");
+            : (prevPopups?.position ?? "auto");
         set("keyword_popups", {
-          keywords: keywords.length ? keywords : (prev?.keywords ?? []),
-          perMinute: prev?.perMinute ?? 6,
+          keywords: keywords.length ? keywords : (prevPopups?.keywords ?? []),
+          perMinute: prevPopups?.perMinute ?? 6,
           position,
-          theme: prev?.theme ?? "light",
-          icons: has("sem icone", "sem emoji") ? false : has("com icone", "com emoji") ? true : (prev?.icons ?? true),
-          color: prev?.color ?? "#FACC15",
+          theme: prevPopups?.theme ?? "light",
+          icons: /sem (?:os |as )?(?:icones?|emojis?)/.test(text) ? false : has("com icone", "com emoji") ? true : (prevPopups?.icons ?? true),
+          color: prevPopups?.color ?? "#FACC15",
         });
         actions.push(
           keywords.length
@@ -382,30 +413,50 @@ function splitClauses(instruction: string): string[] {
 
 // Palavras de escopo/posição que nunca são o "assunto" pedido ("em todo o vídeo", "em cima").
 const NOT_KEYWORDS = new Set(
-  "momentos momento importantes importante partes parte video videos todo toda todos cada frase frases cima baixo meio centro tela palavra palavras falo fala diz digo emojis emoji icones elementos legendas legenda".split(
+  "momentos momento importantes importante principais principal partes parte video videos todo toda todos cada frase frases cima baixo meio centro topo rodape tela palavra palavras chave chaves falo fala diz digo emojis emoji icones elementos legendas legenda".split(
     " ",
   ),
 );
+// Depois da palavra pedida, frases de posição/escopo encerram a lista ("dinheiro em cima da tela").
+const SCOPE_TAIL = /\s(?:em cima|no topo|no centro|no meio|embaixo|em baixo|no video|em todo|na tela|no rodape)\b.*$/u;
 
 function keywordList(raw: string): string[] {
   return raw
+    .replace(SCOPE_TAIL, "")
     .split(/\s+e\s+|,|\s+ou\s+/)
-    .map((w) => w.trim().split(" ").filter((p) => p.length > 2).pop() ?? "")
-    .filter((w) => w.length > 2 && !NOT_KEYWORDS.has(w))
+    .map((w) => w.trim().split(" ").filter((p) => p.length > 2 && !NOT_KEYWORDS.has(p)).pop() ?? "")
+    .filter((w) => w.length > 2)
     .slice(0, 5);
 }
 
+const SPOKEN = "quando (?:\\p{L}+ )?(?:falar|disser|digo|mencionar|citar)";
+
 function extractKeywords(text: string): string[] {
-  const m = text.match(/(?:quando (?:eu )?(?:falar|disser|digo|mencionar|citar)|na palavra|nas palavras|(?:^|\s)em)\s+(?:sobre |de |em |a palavra |o |a )?([\p{L}\s]+?)(?:\s+e\s+(?:deixe|coloque|faca|remova|tire)|$)/u);
+  const m = text.match(
+    new RegExp(`(?:${SPOKEN}|na palavra|nas palavras|(?:^|\\s)em)\\s+(?:sobre |de |em |a palavra |o |a )?([\\p{L}\\s]+?)(?:\\s+e\\s+(?:deixe|coloque|faca|remova|tire)|$)`, "u"),
+  );
   return m ? keywordList(m[1]!) : [];
 }
 
 /** Só formas explícitas ("quando eu falar X", "a palavra X"): o resto é escolha automática. */
 function extractSpokenKeywords(text: string): string[] {
   const m = text.match(
-    /(?:quando (?:eu |ela |ele )?(?:falar|disser|digo|mencionar|citar)|(?:na|nas|a|as) palavras?)\s+(?:sobre |de |a palavra |o |a )?([\p{L}\s]+?)(?:\s+e\s+(?:deixe|coloque|faca|remova|tire)|$)/u,
+    new RegExp(`(?:${SPOKEN}|(?:na|nas|a|as) palavras?)\\s+(?:sobre |de |a palavra |o |a )?([\\p{L}\\s]+?)(?:\\s+e\\s+(?:deixe|coloque|faca|remova|tire)|$)`, "u"),
   );
   return m ? keywordList(m[1]!) : [];
+}
+
+/** "sem pop ups", "sem os emojis", "sem nenhum elemento". */
+const NEGATED_POPUPS = /(?:^| )sem (?:os |as |nenhum |nenhuma )?(?:pop ?ups?|emojis?|icones?|elementos?|destaques? animados?|cards?)\b/;
+
+/** Pedido de 3D: "3d", "3 d", "tridimensional", "relevo" (palavra inteira: "3 dicas" não conta). */
+function wants3d(text: string): boolean {
+  return /(?:^| )3 ?d(?: |$)/.test(text) || /tridimension|relevo/.test(text);
+}
+
+/** "sem 3d", "tire o 3d", "remova o efeito 3d", "sem relevo". */
+function negates3d(text: string): boolean {
+  return /(?:sem|tir\w*|remov\w*|desativ\w*|desliga\w*|nao quero)(?: \p{L}+){0,3} (?:3 ?d|relevo|tridimensional)(?: |$)/u.test(text);
 }
 
 function toNumber(token: string): number | null {

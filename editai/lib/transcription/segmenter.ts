@@ -79,14 +79,10 @@ export function planPieces(
 }
 
 /** Alucinações clássicas do Whisper em PT quando há silêncio/música. */
-export const HALLUCINATION_PATTERNS = [
-  /amara\.org/i,
-  /legendas? (pela|por) comunidade/i,
-  /^(obrigad[oa]|valeu) por assistir/i,
-  /inscreva-se no canal/i,
-];
+const ALWAYS_HALLUCINATED = [/amara\.org/i, /legendas? (pela|por) comunidade/i];
+export const HALLUCINATION_PATTERNS = [...ALWAYS_HALLUCINATED, /^(obrigad[oa]|valeu) por assistir/i, /inscreva-se no canal/i];
 
-export function cleanPieceWords(words: TimedWord[], pieceDur: number): { words: TimedWord[]; loopTrimmed: boolean } {
+export function cleanPieceWords(words: TimedWord[], pieceDur: number, speechSec = 0): { words: TimedWord[]; loopTrimmed: boolean } {
   let ws = words
     .filter((w) => w.word.length > 0 && w.start < pieceDur - 0.02)
     .map((w) => ({ ...w, end: Math.min(Math.max(w.end, w.start + 0.05), pieceDur) }));
@@ -108,9 +104,12 @@ export function cleanPieceWords(words: TimedWord[], pieceDur: number): { words: 
       }
     }
   }
-  // Só descarta quando a frase alucinada é praticamente tudo o que veio: uma despedida
-  // real ("Obrigado por assistir, deixa seu like...") no meio da fala fica.
-  if (ws.length <= 8 && HALLUCINATION_PATTERNS.some((r) => r.test(ws.map((w) => w.word).join(" ")))) return { words: [], loopTrimmed };
+  // Créditos de legenda (Amara) são sempre alucinação. Despedidas ("Obrigado por assistir",
+  // "inscreva-se no canal") só são descartadas quando são quase tudo o que veio E quase não
+  // há fala no áudio do pedaço: uma despedida real no fim do vídeo fica.
+  const text = ws.map((w) => w.word).join(" ");
+  if (ALWAYS_HALLUCINATED.some((r) => r.test(text))) return { words: [], loopTrimmed };
+  if (ws.length <= 8 && speechSec < 1 && HALLUCINATION_PATTERNS.some((r) => r.test(text))) return { words: [], loopTrimmed };
   return { words: ws, loopTrimmed };
 }
 

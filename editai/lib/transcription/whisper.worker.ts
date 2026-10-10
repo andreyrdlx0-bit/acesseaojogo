@@ -71,7 +71,12 @@ async function load(device: WhisperDevice, model: ModelChoice): Promise<Automati
   return asr;
 }
 
-async function transcribePiece(asr: AutomaticSpeechRecognitionPipeline, audio: Float32Array, language: string): Promise<TimedWord[]> {
+async function transcribePiece(
+  asr: AutomaticSpeechRecognitionPipeline,
+  audio: Float32Array,
+  language: string,
+  speechSec: number,
+): Promise<TimedWord[]> {
   const dur = audio.length / SAMPLE_RATE;
   const base = { language, task: "transcribe", return_timestamps: "word" as const };
   // Pedaço <= 28 s: NÃO passar chunk_length_s (o pedaço já foi cortado num silêncio).
@@ -81,11 +86,11 @@ async function transcribePiece(asr: AutomaticSpeechRecognitionPipeline, audio: F
   if (out.text.trim().length > 0 && (raw.length === 0 || (raw.length >= 3 && raw.every((w) => w.start === raw[0]!.start)))) {
     throw new Error("Timestamps por palavra inválidos neste dispositivo.");
   }
-  let best = cleanPieceWords(raw, dur);
+  let best = cleanPieceWords(raw, dur, speechSec);
   if (best.loopTrimmed) {
     // Laço de repetição detectado: tenta de novo proibindo n-gramas repetidos.
     const retry = await asr(audio, { ...base, no_repeat_ngram_size: 3 });
-    const r2 = cleanPieceWords(chunksToWords(retry.chunks), dur);
+    const r2 = cleanPieceWords(chunksToWords(retry.chunks), dur, speechSec);
     if (r2.words.length > best.words.length) best = r2;
   }
   return best.words;
@@ -127,14 +132,14 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
       const slice = audio.subarray(Math.round(p.start * SAMPLE_RATE), Math.round(p.end * SAMPLE_RATE));
       let pieceWords: TimedWord[];
       try {
-        pieceWords = await transcribePiece(asr, slice, config.language);
+        pieceWords = await transcribePiece(asr, slice, config.language, p.speechSec);
       } catch (err) {
         if (device !== "webgpu") throw err;
         // Alguns GPUs/drivers falham na 1ª inferência: cai para WASM e refaz este pedaço.
         post({ type: "fallback", from: "webgpu", to: "wasm", reason: String((err as Error)?.message ?? err) });
         device = "wasm";
         asr = await load(device, models.wasm);
-        pieceWords = await transcribePiece(asr, slice, config.language);
+        pieceWords = await transcribePiece(asr, slice, config.language, p.speechSec);
       }
       for (const w of pieceWords) {
         words.push({ word: w.word, start: round2(w.start + p.start), end: round2(w.end + p.start) });
